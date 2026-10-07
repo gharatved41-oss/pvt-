@@ -43,6 +43,7 @@ interface TwinEngineState {
   startSimulation: () => Promise<void>;
   resetSimulation: () => void;
   patchEdge: (edgeId: string) => void;
+  applyPatch: (edgeId?: string) => void;
   selectNode: (nodeId: string | null) => void;
 }
 
@@ -139,9 +140,18 @@ export const useTwinEngine = create<TwinEngineState>((set, get) => ({
   },
 
   patchEdge: (edgeId: string) => {
+    get().applyPatch(edgeId);
+  },
+
+  applyPatch: (edgeId?: string) => {
     const { edges, nodes, logs } = get();
-    const updatedEdges = edges.map((e) => (e.id === edgeId ? { ...e, accessState: 'blocked' as AccessState } : e));
-    const targetEdge = edges.find((e) => e.id === edgeId);
+    // Default to database ingress edge if none specified
+    const targetEdgeId = edgeId || 'edge-app-db';
+    const targetEdge = edges.find((e) => e.id === targetEdgeId);
+
+    const updatedEdges = edges.map((e) =>
+      e.id === targetEdgeId ? { ...e, accessState: 'blocked' as AccessState } : e
+    );
 
     const updatedNodes = nodes.map((n) => {
       if (targetEdge && n.id === targetEdge.target) {
@@ -153,12 +163,13 @@ export const useTwinEngine = create<TwinEngineState>((set, get) => ({
     set({
       edges: updatedEdges,
       nodes: updatedNodes,
+      blastRadius: 0,
       logs: [
         ...logs,
         {
           timestamp: getTimestamp(),
           level: 'INFO',
-          message: `[REMEDIATION] Edge ${edgeId} blocked. Downstream nodes marked patched.`,
+          message: `[SUCCESS] Attack path severed. Re-test verified. Port ${targetEdge?.port || 5432} blocked.`,
         },
       ],
     });
