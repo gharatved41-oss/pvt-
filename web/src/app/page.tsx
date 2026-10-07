@@ -122,7 +122,13 @@ export default function MainPage() {
 
       {/* View Switcher: Public Showcase vs. Interactive Twin Sandbox */}
       {viewMode === 'landing' ? (
-        <LandingHero onActionClick={handleActionClick} />
+        <LandingHero
+          onActionClick={handleActionClick}
+          onReplayIntro={() => {
+            sessionStorage.removeItem('hasSeenIntro');
+            setShowSplash(true);
+          }}
+        />
       ) : (
         <div className="flex flex-col h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans select-none">
           {/* Header Navigation with Showcase Return Option */}

@@ -3,82 +3,77 @@
 import React from 'react';
 import {
   Shield,
-  Server,
-  Database,
   ArrowRight,
-  Lock,
-  Cpu,
-  Layers,
-  Activity,
-  CheckCircle2,
-  AlertTriangle,
   Play,
-  KeyRound,
-  FileText,
-  Workflow,
+  RotateCcw,
   Sparkles,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 
 interface LandingHeroProps {
   onActionClick: (actionName: string) => void;
+  onReplayIntro?: () => void;
 }
 
-export function LandingHero({ onActionClick }: LandingHeroProps) {
+export function LandingHero({ onActionClick, onReplayIntro }: LandingHeroProps) {
   const { user, role, loginAsDeveloper } = useAuthStore();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans select-none">
-      {/* Top Navigation Banner */}
-      <header className="h-14 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-mono select-none">
+      {/* Top Header */}
+      <header className="h-14 border-b border-zinc-800 bg-zinc-950 px-6 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="p-1.5 rounded bg-zinc-900 border border-zinc-800 text-emerald-400">
+          <div className="w-7 h-7 bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400">
             <Shield className="w-4 h-4" />
           </div>
           <div>
-            <span className="text-xs font-bold font-mono text-zinc-100 tracking-wider uppercase">
-              VulnTwin AI
+            <span className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
+              VULNTWIN AI
             </span>
-            <span className="text-[10px] font-mono text-zinc-500 ml-2 hidden sm:inline">
-              // Continuous Threat Exposure Management
+            <span className="text-[10px] text-zinc-500 ml-2 hidden sm:inline">
+              // ADVERSARIAL DIGITAL TWIN PLATFORM
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 text-xs font-mono text-zinc-400 border-r border-zinc-800 pr-4">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-zinc-500">RUNTIME:</span>
-            <span className="text-zinc-300">BROWSER_ISOLATED</span>
-          </div>
+        <div className="flex items-center gap-3 text-xs">
+          {onReplayIntro && (
+            <button
+              type="button"
+              onClick={onReplayIntro}
+              className="px-2.5 py-1 text-[11px] border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 flex items-center gap-1 transition-colors"
+              title="Replay Brand Intro Animation"
+            >
+              <RotateCcw className="w-3 h-3 text-emerald-400" />
+              <span>REPLAY_INTRO</span>
+            </button>
+          )}
 
           {user ? (
             <button
               type="button"
               onClick={() => onActionClick('Launch Digital Twin')}
-              className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold font-mono text-xs rounded-md transition-colors flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold uppercase transition-colors flex items-center gap-1.5"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Enter Sandbox</span>
+              <span>ENTER WORKSPACE</span>
             </button>
           ) : (
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => loginAsDeveloper('sara.dongare@corp-sec.com')}
-                className="px-2.5 py-1.5 border border-emerald-800/80 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 font-mono text-xs rounded-md transition-colors flex items-center gap-1.5"
-                title="Direct Administrator Clearance"
+                className="px-2.5 py-1.5 border border-emerald-800 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 transition-colors uppercase text-[11px]"
               >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Dev Clearance</span>
+                DEV_CLEARANCE
               </button>
 
               <button
                 type="button"
                 onClick={() => onActionClick('Sign In')}
-                className="px-3 py-1.5 bg-zinc-100 hover:bg-white text-zinc-950 font-semibold font-mono text-xs rounded-md transition-colors"
+                className="px-3 py-1.5 bg-zinc-100 hover:bg-white text-zinc-950 font-bold uppercase transition-colors"
               >
-                Sign In
+                SIGN IN
               </button>
             </div>
           )}
@@ -86,204 +81,151 @@ export function LandingHero({ onActionClick }: LandingHeroProps) {
       </header>
 
       {/* Hero Section */}
-      <section className="px-6 py-16 md:py-24 max-w-6xl mx-auto flex flex-col items-center text-center space-y-6">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-900/60 bg-emerald-950/30 text-emerald-400 text-xs font-mono">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Next-Gen Adversarial Exposure Validation (AEV)</span>
+      <section className="px-6 py-16 md:py-20 max-w-5xl mx-auto flex flex-col items-center text-center space-y-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 border border-zinc-800 bg-zinc-900 text-emerald-400 text-xs">
+          <Sparkles className="w-3 h-3" />
+          <span>CONTINUOUS THREAT EXPOSURE MANAGEMENT (CTEM)</span>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-zinc-100 max-w-4xl font-mono leading-tight">
-          Mathematical Breach Simulation On Digital Twins.{' '}
-          <span className="text-zinc-500 font-normal">Zero Production Risk.</span>
+        <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-zinc-100 uppercase leading-snug">
+          MATHEMATICAL BREACH SIMULATION ON DIGITAL TWINS.{' '}
+          <span className="text-zinc-500">ZERO PRODUCTION RISK.</span>
         </h1>
 
-        <p className="text-sm sm:text-base text-zinc-400 max-w-2xl font-sans leading-relaxed">
+        <p className="text-xs sm:text-sm text-zinc-400 max-w-2xl leading-relaxed">
           Safely validate multi-hop attack reachability, compound blast radius, and automated security rule remediation in the browser runtime using deterministic graph mathematics.
         </p>
 
-        {/* Primary Action Buttons */}
+        {/* Primary Action Triggers */}
         <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
           <button
             type="button"
             onClick={() => onActionClick('Launch Digital Twin')}
-            className="px-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-950 font-semibold font-mono text-xs rounded-md transition-colors flex items-center gap-2"
+            className="px-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs uppercase flex items-center gap-2 transition-colors"
           >
-            <span>Launch Digital Twin</span>
-            <ArrowRight className="w-4 h-4" />
+            <span>LAUNCH DIGITAL TWIN</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
 
           <button
             type="button"
             onClick={() => onActionClick('Run AI Validation')}
-            className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-mono text-xs rounded-md transition-colors flex items-center gap-2"
+            className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs uppercase flex items-center gap-2 transition-colors"
           >
             <Play className="w-3.5 h-3.5 fill-current text-emerald-400" />
-            <span>Run AI Validation Demo</span>
+            <span>RUN AI VALIDATION</span>
           </button>
         </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full pt-12 border-t border-zinc-800/80 font-mono text-left">
-          <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-md">
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Breach Model</div>
-            <div className="text-lg font-bold text-zinc-100 mt-1">Directed Graph G(V,E)</div>
-            <div className="text-[11px] text-emerald-400 mt-0.5">Deterministic Traversal</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full pt-10 border-t border-zinc-800 text-left text-xs">
+          <div className="p-3 bg-zinc-900 border border-zinc-800">
+            <div className="text-[10px] text-zinc-500 uppercase">BREACH MODEL</div>
+            <div className="font-bold text-zinc-100 mt-1">DIRECTED GRAPH G(V,E)</div>
+            <div className="text-[10px] text-emerald-400 mt-0.5">DETERMINISTIC TRAVERSAL</div>
           </div>
-          <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-md">
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Production Cost</div>
-            <div className="text-lg font-bold text-zinc-100 mt-1">$0.00 / Zero Packets</div>
-            <div className="text-[11px] text-emerald-400 mt-0.5">Isolated Twin Runtime</div>
+          <div className="p-3 bg-zinc-900 border border-zinc-800">
+            <div className="text-[10px] text-zinc-500 uppercase">PACKET OVERHEAD</div>
+            <div className="font-bold text-zinc-100 mt-1">0 LIVE PACKETS</div>
+            <div className="text-[10px] text-emerald-400 mt-0.5">ISOLATED SIMULATOR</div>
           </div>
-          <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-md">
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Compound Risk</div>
-            <div className="text-lg font-bold text-zinc-100 mt-1">Blast Radius R(C,D)</div>
-            <div className="text-[11px] text-amber-400 mt-0.5">Logarithmic Scaling</div>
+          <div className="p-3 bg-zinc-900 border border-zinc-800">
+            <div className="text-[10px] text-zinc-500 uppercase">COMPOUND RISK</div>
+            <div className="font-bold text-zinc-100 mt-1">BLAST RADIUS R(C,D)</div>
+            <div className="text-[10px] text-amber-400 mt-0.5">LOGARITHMIC SCALING</div>
           </div>
-          <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-md">
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Remediation Loop</div>
-            <div className="text-lg font-bold text-zinc-100 mt-1">Closed-Loop Verification</div>
-            <div className="text-[11px] text-emerald-400 mt-0.5">Automated Re-Test</div>
+          <div className="p-3 bg-zinc-900 border border-zinc-800">
+            <div className="text-[10px] text-zinc-500 uppercase">REMEDIATION LOOP</div>
+            <div className="font-bold text-zinc-100 mt-1">CLOSED-LOOP ATTESTATION</div>
+            <div className="text-[10px] text-emerald-400 mt-0.5">AUTONOMOUS RE-TEST</div>
           </div>
         </div>
       </section>
 
-      {/* Interactive Topology Showcase Cards */}
-      <section className="px-6 py-12 max-w-6xl mx-auto w-full space-y-6">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <div>
-            <h2 className="text-sm font-bold font-mono text-zinc-100 uppercase tracking-wider">
-              Pre-Configured Architecture Topologies
-            </h2>
-            <p className="text-xs text-zinc-400 font-sans mt-0.5">
-              Click any environment template below to inspect choke points and simulate reachability.
-            </p>
-          </div>
-          <span className="text-[10px] font-mono text-zinc-500">2 TEMPLATES READY</span>
+      {/* Architecture Showcase Cards */}
+      <section className="px-6 py-10 max-w-5xl mx-auto w-full space-y-4">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+          <span className="text-xs font-bold text-zinc-100 uppercase">
+            TARGET ENVIRONMENT TOPOLOGIES
+          </span>
+          <span className="text-[10px] text-zinc-500">2 TEMPLATES READY</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-mono">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
           {/* Card 1: Enterprise Cloud VPC */}
-          <div className="bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 rounded-md p-5 flex flex-col justify-between transition-all group">
-            <div className="space-y-3">
+          <div className="bg-zinc-900 border border-zinc-800 p-4 flex flex-col justify-between space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 text-[10px] bg-zinc-800 text-zinc-300 border border-zinc-700 rounded">
+                <span className="px-1.5 py-0.5 text-[10px] bg-zinc-800 text-zinc-300 border border-zinc-700">
                   AWS MULTI-TIER
                 </span>
-                <span className="text-red-400 text-xs font-semibold">CVSS 9.8</span>
+                <span className="text-red-400 font-bold">CVSS 9.8</span>
               </div>
-              <h3 className="text-sm font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors">
+              <h3 className="text-xs font-bold text-zinc-100">
                 Enterprise Cloud VPC (E-Commerce)
               </h3>
-              <p className="text-xs text-zinc-400 font-sans leading-relaxed">
-                Public AWS ALB ingress routing into a Node.js reverse-proxy gateway with permissive internal routing directly into customer PostgreSQL records.
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                Public ALB routing into Node.js gateway with permissive internal access directly to customer PostgreSQL database.
               </p>
-
-              <div className="pt-2 border-t border-zinc-800/80 text-[11px] text-zinc-500 space-y-1">
-                <div className="flex justify-between">
-                  <span>Assets:</span>
-                  <span className="text-zinc-300">4 Nodes • 3 Interconnects</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Exposed Target:</span>
-                  <span className="text-red-400">PostgreSQL (:5432)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Synthetic Records:</span>
-                  <span className="text-amber-400">50,000 PII</span>
-                </div>
-              </div>
             </div>
-
             <button
               type="button"
               onClick={() => onActionClick('Enterprise Cloud VPC')}
-              className="mt-5 w-full bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 py-2 px-3 rounded text-xs flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 py-2 px-3 text-xs flex items-center justify-center gap-1.5 uppercase transition-colors"
             >
-              <span>Inspect & Validate</span>
+              <span>INSPECT & VALIDATE</span>
               <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
             </button>
           </div>
 
           {/* Card 2: Healthcare PACS Network */}
-          <div className="bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 rounded-md p-5 flex flex-col justify-between transition-all group">
-            <div className="space-y-3">
+          <div className="bg-zinc-900 border border-zinc-800 p-4 flex flex-col justify-between space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 text-[10px] bg-zinc-800 text-zinc-300 border border-zinc-700 rounded">
+                <span className="px-1.5 py-0.5 text-[10px] bg-zinc-800 text-zinc-300 border border-zinc-700">
                   HIPAA REGULATED
                 </span>
-                <span className="text-red-400 text-xs font-semibold">CVSS 9.4</span>
+                <span className="text-red-400 font-bold">CVSS 9.4</span>
               </div>
-              <h3 className="text-sm font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors">
+              <h3 className="text-xs font-bold text-zinc-100">
                 Healthcare PACS Network (PHI Vault)
               </h3>
-              <p className="text-xs text-zinc-400 font-sans leading-relaxed">
-                External VPN Gateway routing tele-radiology traffic into an Orthanc DICOM Web API with unsegmented communication to the patient records archive.
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                VPN gateway routing tele-radiology traffic into Orthanc DICOM Web with unsegmented communication to patient records.
               </p>
-
-              <div className="pt-2 border-t border-zinc-800/80 text-[11px] text-zinc-500 space-y-1">
-                <div className="flex justify-between">
-                  <span>Assets:</span>
-                  <span className="text-zinc-300">3 Nodes • 2 Interconnects</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Exposed Target:</span>
-                  <span className="text-red-400">Patient PHI Vault (:27017)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Synthetic Records:</span>
-                  <span className="text-amber-400">120,000 PHI</span>
-                </div>
-              </div>
             </div>
-
             <button
               type="button"
               onClick={() => onActionClick('Healthcare PACS Network')}
-              className="mt-5 w-full bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 py-2 px-3 rounded text-xs flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 py-2 px-3 text-xs flex items-center justify-center gap-1.5 uppercase transition-colors"
             >
-              <span>Inspect & Validate</span>
+              <span>INSPECT & VALIDATE</span>
               <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
             </button>
           </div>
 
           {/* Card 3: Active Threat Engine */}
-          <div className="bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 rounded-md p-5 flex flex-col justify-between transition-all group">
-            <div className="space-y-3">
+          <div className="bg-zinc-900 border border-zinc-800 p-4 flex flex-col justify-between space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded">
+                <span className="px-1.5 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800">
                   CLOSED-LOOP AEV
                 </span>
-                <span className="text-emerald-400 text-xs font-semibold">VERIFIED_SAFE</span>
+                <span className="text-emerald-400 font-bold">VERIFIED_SAFE</span>
               </div>
-              <h3 className="text-sm font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors">
+              <h3 className="text-xs font-bold text-zinc-100">
                 Automated Remediation Loop
               </h3>
-              <p className="text-xs text-zinc-400 font-sans leading-relaxed">
-                When an exploit vector succeeds, VulnTwin generates precise isolation rules (Terraform / iptables), applies them to the digital twin, and autonomously re-tests the attack.
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                When breach vector succeeds, generate atomic isolation rules (Terraform/iptables), apply to twin, and autonomously re-test.
               </p>
-
-              <div className="pt-2 border-t border-zinc-800/80 text-[11px] text-zinc-500 space-y-1">
-                <div className="flex justify-between">
-                  <span>Isolation Logic:</span>
-                  <span className="text-zinc-300">Atomic Edge Block</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Verification:</span>
-                  <span className="text-emerald-400">Autonomous Re-Test</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Rollback Protection:</span>
-                  <span className="text-zinc-300">Zero-Downtime Attestation</span>
-                </div>
-              </div>
             </div>
-
             <button
               type="button"
               onClick={() => onActionClick('Automated Remediation')}
-              className="mt-5 w-full bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 py-2 px-3 rounded text-xs flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 py-2 px-3 text-xs flex items-center justify-center gap-1.5 uppercase transition-colors"
             >
-              <span>Inspect Remediation</span>
+              <span>INSPECT REMEDIATION</span>
               <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
             </button>
           </div>
@@ -291,16 +233,9 @@ export function LandingHero({ onActionClick }: LandingHeroProps) {
       </section>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-zinc-800 bg-zinc-950 px-6 py-6 font-mono text-[11px] text-zinc-500 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Shield className="w-3.5 h-3.5 text-emerald-400" />
-          <span>VulnTwin AI — Enterprise Adversarial Exposure Validation</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span>Client-Side CTEM Simulator</span>
-          <span>•</span>
-          <span>RBAC Firestore Protected</span>
-        </div>
+      <footer className="mt-auto border-t border-zinc-800 bg-zinc-950 px-6 py-4 text-[10px] text-zinc-500 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <span>VULNTWIN AI // ENTERPRISE EXPOSURE VALIDATION PLATFORM</span>
+        <span>ZERO PRODUCTION IMPACT • DETERMINISTIC GRAPH MATHEMATICS</span>
       </footer>
     </div>
   );

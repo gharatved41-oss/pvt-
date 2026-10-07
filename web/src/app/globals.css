@@ -4,37 +4,26 @@
 
 @layer base {
   :root {
-    /* Strict Dark Theme by Default (Zinc base, Datadog/CrowdStrike Enterprise Aesthetic) */
     --background: 240 10% 3.9%; /* #09090b (zinc-950) */
     --foreground: 0 0% 98%;      /* #fafafa (zinc-50) */
-
-    --card: 240 10% 4.9%;        /* #0c0c0e */
+    --card: 240 10% 4.9%;
     --card-foreground: 0 0% 98%;
-
     --popover: 240 10% 4.9%;
     --popover-foreground: 0 0% 98%;
-
     --primary: 0 0% 98%;
     --primary-foreground: 240 5.9% 10%;
-
     --secondary: 240 3.7% 15.9%; /* #27272a (zinc-800) */
     --secondary-foreground: 0 0% 98%;
-
     --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%; /* zinc-400 */
-
+    --muted-foreground: 240 5% 64.9%;
     --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-
     --border: 240 3.7% 15.9%;     /* #27272a (zinc-800) */
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
-
-    /* Sharp geometry: 6px max */
-    --radius: 0.375rem;
+    --radius: 0px;
   }
 
   * {
@@ -42,8 +31,58 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased selection:bg-zinc-800 selection:text-zinc-100;
+    @apply bg-zinc-950 text-zinc-100 font-mono antialiased selection:bg-zinc-800 selection:text-zinc-100;
     background-color: #09090b;
     color: #f4f4f5;
   }
+}
+
+/* Custom CSS keyframe animations for IntroSplash */
+@keyframes drawEdge {
+  0% {
+    stroke-dashoffset: 120;
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes nodePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 1;
+  }
+}
+
+@keyframes sweepBeam {
+  0% {
+    stroke-dashoffset: 200;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.anim-draw-edge {
+  stroke-dasharray: 120;
+  animation: drawEdge 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.anim-node-pulse {
+  transform-origin: center;
+  animation: nodePulse 1.2s ease-in-out infinite;
+}
+
+.anim-beam {
+  stroke-dasharray: 60 140;
+  animation: sweepBeam 1.8s linear infinite;
 }
