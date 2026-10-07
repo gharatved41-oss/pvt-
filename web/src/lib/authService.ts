@@ -11,22 +11,14 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
-export type UserRole = 'user' | 'developer';
-
-export interface UserProfileData {
-  uid: string;
-  email: string | null;
-  role: UserRole;
-  createdAt?: unknown;
-  scansUsed?: number;
-}
+export type UserRole = 'developer' | 'user';
 
 /**
- * Checks if a document exists in Firestore at `/users/{user.uid}`.
- * If not, creates it with role 'user' by default.
+ * syncUserRole(user): Query Firestore `/users/{user.uid}`.
  * If user.email matches process.env.NEXT_PUBLIC_ADMIN_EMAIL, sets role to 'developer'.
+ * Otherwise defaults to 'user'. Persists new profiles to Firestore.
  */
-export async function syncUserProfile(user: User): Promise<UserRole> {
+export async function syncUserRole(user: User): Promise<UserRole> {
   const adminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim();
   const userEmail = (user.email || '').toLowerCase().trim();
   const isDeveloper = Boolean(adminEmail && userEmail === adminEmail);
@@ -47,42 +39,58 @@ export async function syncUserProfile(user: User): Promise<UserRole> {
   }
 
   const existingData = docSnap.data();
+  if (isDeveloper && existingData?.role !== 'developer') {
+    await setDoc(userDocRef, { role: 'developer' }, { merge: true });
+    return 'developer';
+  }
+
   const existingRole = (existingData?.role as UserRole) || targetRole;
   return existingRole;
 }
 
 /**
- * Sign in using GoogleAuthProvider with forced account selection prompt.
+ * Backward compatibility alias for syncUserRole
  */
-export async function loginWithGoogle(): Promise<UserCredential> {
+export const syncUserProfile = syncUserRole;
+
+/**
+ * signInWithGoogle: Use signInWithPopup with provider.setCustomParameters({ prompt: 'select_account' }).
+ * MUST throw real errors. NO dummy user fallbacks.
+ */
+export async function signInWithGoogle(): Promise<UserCredential> {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   const credential = await signInWithPopup(auth, provider);
-  await syncUserProfile(credential.user);
+  await syncUserRole(credential.user);
   return credential;
 }
 
 /**
- * Sign in using Email and Password.
+ * Backward compatibility alias
+ */
+export const loginWithGoogle = signInWithGoogle;
+
+/**
+ * signInWithEmail / loginWithEmail: Real email/password sign-in with syncUserRole.
  */
 export async function loginWithEmail(email: string, password: string): Promise<UserCredential> {
   const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
-  await syncUserProfile(credential.user);
+  await syncUserRole(credential.user);
   return credential;
 }
 
 /**
- * Register account with Email and Password, immediately dispatching email verification link.
+ * registerWithEmail: Real user registration, immediate verification dispatch, and syncUserRole.
  */
 export async function registerWithEmail(email: string, password: string): Promise<UserCredential> {
   const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
   await sendEmailVerification(credential.user);
-  await syncUserProfile(credential.user);
+  await syncUserRole(credential.user);
   return credential;
 }
 
 /**
- * Sign out current authenticated user.
+ * logout: Real Firebase sign out.
  */
 export async function logout(): Promise<void> {
   await firebaseSignOut(auth);

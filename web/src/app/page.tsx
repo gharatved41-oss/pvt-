@@ -14,7 +14,7 @@ import { useTwinStore } from '@/store/useTwinStore';
 import { Play, RefreshCw, ShieldAlert, Layers, Home, Eye } from 'lucide-react';
 
 export default function MainPage() {
-  const { user, role, scansUsed, maxScans, setupAuthListener, loading } = useAuthStore();
+  const { user, role, scansUsed, maxScans } = useAuthStore();
   const {
     simulationStatus,
     simulationProgress,
@@ -30,21 +30,15 @@ export default function MainPage() {
   const [viewMode, setViewMode] = useState<'landing' | 'sandbox'>('landing');
   const [verificationError, setVerificationError] = useState<string | null>(null);
 
-  // 1. Initialize Auth and Session Intro Check
+  // 1. Session Intro Splash Check
   useEffect(() => {
-    const unsub = setupAuthListener();
-
     if (typeof window !== 'undefined') {
       const seen = sessionStorage.getItem('hasSeenIntro');
       if (!seen) {
         setShowSplash(true);
       }
     }
-
-    return () => {
-      if (unsub) unsub();
-    };
-  }, [setupAuthListener]);
+  }, []);
 
   const isDeveloper = role === 'developer';
   const isRunning = simulationStatus === 'RUNNING';
