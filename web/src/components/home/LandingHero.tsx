@@ -16,7 +16,7 @@ interface LandingHeroProps {
 }
 
 export function LandingHero({ onActionClick, onReplayIntro }: LandingHeroProps) {
-  const { user, role, loginAsDeveloper } = useAuthStore();
+  const { user } = useAuthStore();
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-mono select-none">
@@ -60,14 +60,6 @@ export function LandingHero({ onActionClick, onReplayIntro }: LandingHeroProps) 
             </button>
           ) : (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => loginAsDeveloper('sara.dongare@corp-sec.com')}
-                className="px-2.5 py-1.5 border border-emerald-800 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 transition-colors uppercase text-[11px]"
-              >
-                DEV_CLEARANCE
-              </button>
-
               <button
                 type="button"
                 onClick={() => onActionClick('Sign In')}

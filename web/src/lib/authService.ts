@@ -1,5 +1,6 @@
 import {
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -23,6 +24,10 @@ export async function syncUserRole(user: User): Promise<UserRole> {
   const userEmail = (user.email || '').toLowerCase().trim();
   const isDeveloper = Boolean(adminEmail && userEmail === adminEmail);
   const targetRole: UserRole = isDeveloper ? 'developer' : 'user';
+
+  if (!db) {
+    return targetRole;
+  }
 
   const userDocRef = doc(db, 'users', user.uid);
   const docSnap = await getDoc(userDocRef);
@@ -71,10 +76,29 @@ export async function signInWithGoogle(): Promise<UserCredential> {
 export const loginWithGoogle = signInWithGoogle;
 
 /**
+ * signInWithApple: Use OAuthProvider('apple.com') with email and name scopes.
+ * MUST throw real errors. NO dummy user fallbacks.
+ */
+export async function signInWithApple(): Promise<UserCredential> {
+  const provider = new OAuthProvider('apple.com');
+  provider.addScope('email');
+  provider.addScope('name');
+  const credential = await signInWithPopup(auth, provider);
+  await syncUserRole(credential.user);
+  return credential;
+}
+
+/**
+ * Backward compatibility alias
+ */
+export const loginWithApple = signInWithApple;
+
+/**
  * signInWithEmail / loginWithEmail: Real email/password sign-in with syncUserRole.
  */
 export async function loginWithEmail(email: string, password: string): Promise<UserCredential> {
-  const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+  const cleanEmail = email.trim().toLowerCase();
+  const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
   await syncUserRole(credential.user);
   return credential;
 }
@@ -83,7 +107,8 @@ export async function loginWithEmail(email: string, password: string): Promise<U
  * registerWithEmail: Real user registration, immediate verification dispatch, and syncUserRole.
  */
 export async function registerWithEmail(email: string, password: string): Promise<UserCredential> {
-  const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  const cleanEmail = email.trim().toLowerCase();
+  const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
   await sendEmailVerification(credential.user);
   await syncUserRole(credential.user);
   return credential;

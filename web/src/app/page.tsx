@@ -22,7 +22,7 @@ export default function MainPage() {
     loadTemplate,
   } = useTwinStore();
 
-  const [showSplash, setShowSplash] = useState<boolean>(false);
+  const [showSplash, setShowSplash] = useState<boolean>(true);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
   const [targetAction, setTargetAction] = useState<string>('');
   const [viewMode, setViewMode] = useState<'landing' | 'sandbox'>('landing');
@@ -32,8 +32,8 @@ export default function MainPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const seen = sessionStorage.getItem('hasSeenIntro');
-      if (!seen) {
-        setShowSplash(true);
+      if (seen === 'true') {
+        setShowSplash(false);
       }
     }
   }, []);

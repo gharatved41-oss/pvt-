@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { api, DigitalTwinModel } from '@/lib/api';
+import { useAuthStore } from './useAuthStore';
 
 export type NodeType = 'ingress' | 'compute' | 'database';
 export type NodeStatus = 'healthy' | 'probing' | 'compromised' | 'patched';
@@ -38,12 +40,13 @@ interface TwinEngineState {
   blastRadius: number;
   isSimulating: boolean;
   selectedNodeId: string | null;
+  twinId: string | null;
 
   // Actions
   startSimulation: () => Promise<void>;
   resetSimulation: () => void;
   patchEdge: (edgeId: string) => void;
-  applyPatch: (edgeId?: string) => void;
+  applyPatch: (edgeId?: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
 }
 
@@ -118,6 +121,7 @@ export const useTwinEngine = create<TwinEngineState>((set, get) => ({
   blastRadius: 0,
   isSimulating: false,
   selectedNodeId: null,
+  twinId: null,
 
   selectNode: (nodeId: string | null) => {
     set({ selectedNodeId: nodeId });
@@ -136,6 +140,7 @@ export const useTwinEngine = create<TwinEngineState>((set, get) => ({
       ],
       blastRadius: 0,
       isSimulating: false,
+      twinId: null,
     });
   },
 
@@ -143,8 +148,8 @@ export const useTwinEngine = create<TwinEngineState>((set, get) => ({
     get().applyPatch(edgeId);
   },
 
-  applyPatch: (edgeId?: string) => {
-    const { edges, nodes, logs } = get();
+  applyPatch: async (edgeId?: string) => {
+    const { edges, nodes, logs, twinId } = get();
     // Default to database ingress edge if none specified
     const targetEdgeId = edgeId || 'edge-app-db';
     const targetEdge = edges.find((e) => e.id === targetEdgeId);
@@ -173,23 +178,77 @@ export const useTwinEngine = create<TwinEngineState>((set, get) => ({
         },
       ],
     });
+
+    // Real backend attestation
+    const activeId = twinId || 'TWIN-DEMO';
+    try {
+      const remediated = await api.remediateTwin(activeId);
+      if (remediated?.before_after_delta) {
+        const delta = remediated.before_after_delta;
+        set((s) => ({
+          logs: [
+            ...s.logs,
+            {
+              timestamp: getTimestamp(),
+              level: 'INFO',
+              message: `[BACKEND_ATTESTATION] SafePath Verified: Posture ${delta.before_posture} -> ${delta.after_posture} (+${delta.posture_improvement_points} pts). Open Findings: 0.`,
+            },
+          ],
+        }));
+      }
+    } catch (err) {
+      console.warn('Backend remediation attestation error:', err);
+    }
   },
 
-  /**
-   * startSimulation:
-   * Deterministic adversarial graph traversal engine without generic fake timeouts.
-   * Step 1: Find 'ingress' node. Mark 'probing'. Log: `[INFO] Ingress exposed`.
-   * Step 2: Find connected edges where accessState === 'open'.
-   * Step 3: Traverse to target node. If it has a CVE, mark 'compromised'. Log: `[CRIT] Exploited CVE. Node compromised`.
-   * Step 4: Calculate Blast Radius based on compromised node criticality.
-   */
   startSimulation: async () => {
     const state = get();
     if (state.isSimulating) return;
 
+    // Check quota
+    const authStore = useAuthStore.getState();
+    if (authStore.role === 'user' && authStore.scansUsed >= authStore.maxScans) {
+      set((s) => ({
+        logs: [
+          ...s.logs,
+          {
+            timestamp: getTimestamp(),
+            level: 'CRIT',
+            message: `[QUOTA_EXCEEDED] Daily simulation limit reached (${authStore.scansUsed}/${authStore.maxScans}). Sign in with Developer Account for unlimited quota.`,
+          },
+        ],
+      }));
+      return;
+    }
+
+    // Increment scan quota
+    await authStore.incrementScan();
+
     set({ isSimulating: true, blastRadius: 0 });
 
-    // Step 1: Find 'ingress' node. Mark 'probing'. Log: `[INFO] Ingress exposed`.
+    // Step 1: Initialize backend digital twin model
+    try {
+      const backendTwin = await api.createTwin('aws.vpc.internal.ecommerce', 85, 'MALICIOUS', {
+        cve: 'CVE-2023-38606',
+        target_port: 5432,
+        environment: 'Enterprise Cloud VPC',
+      });
+      set({ twinId: backendTwin.twin_id });
+      set((s) => ({
+        logs: [
+          ...s.logs,
+          {
+            timestamp: getTimestamp(),
+            level: 'INFO',
+            message: `[BACKEND] AutoSecTwin session initialized: ${backendTwin.twin_id}. Baseline Posture: ${backendTwin.initial_posture}/100.`,
+          },
+        ],
+      }));
+    } catch (err) {
+      console.warn('Backend twin synthesis offline or unavailable, continuing local deterministic engine:', err);
+    }
+
+    // Step 2: Find 'ingress' node. Mark 'probing'. Log: `[INFO] Ingress exposed`.
     const ingressNode = get().nodes.find((n) => n.type === 'ingress');
     if (!ingressNode) {
       set({ isSimulating: false });
@@ -218,7 +277,7 @@ export const useTwinEngine = create<TwinEngineState>((set, get) => ({
     while (traversalQueue.length > 0) {
       const currentNodeId = traversalQueue.shift()!;
 
-      // Step 2: Find connected edges where accessState === 'open'
+      // Find connected edges where accessState === 'open'
       const outgoingEdges = get().edges.filter(
         (edge) => edge.source === currentNodeId && edge.accessState === 'open'
       );
@@ -251,7 +310,7 @@ export const useTwinEngine = create<TwinEngineState>((set, get) => ({
 
         await delay(700);
 
-        // Step 3: Traverse to target node. If it has a CVE, mark 'compromised'.
+        // Traverse to target node. If it has a CVE, mark 'compromised'.
         if (targetNode.cve) {
           compromisedNodeList.push({ ...targetNode, status: 'compromised' });
 
@@ -295,7 +354,6 @@ export const useTwinEngine = create<TwinEngineState>((set, get) => ({
     }
 
     // Step 4: Calculate Blast Radius based on compromised node criticality
-    // Sum of criticality (scale 1-10) normalized into a 0-100 index
     const totalCriticality = compromisedNodeList.reduce((acc, curr) => acc + curr.criticality, 0);
     const calculatedRadius = Math.min(100, Math.round((totalCriticality / 17) * 100));
 

@@ -6,12 +6,12 @@ import { auth, db } from '@/lib/firebase';
 export type UserRole = 'developer' | 'user' | null;
 
 interface AuthState {
-  // Directive 1 State: user, role, isInitialized
+  // State: user, role, isInitialized
   user: User | null;
   role: UserRole;
   isInitialized: boolean;
 
-  // Ergonomic compatibility properties
+  // Quota & loading tracking
   loading: boolean;
   scansUsed: number;
   maxScans: number;
@@ -26,8 +26,6 @@ interface AuthState {
   resetScans: () => Promise<void>;
   signOut: () => Promise<void>;
   clearSession: () => void;
-  loginAsDeveloper: (email?: string) => void;
-  loginAsStandard: (email?: string) => void;
   setupAuthListener: () => () => void;
 }
 
@@ -128,46 +126,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (typeof window !== 'undefined') {
       localStorage.removeItem('vulntwin_session');
     }
-  },
-
-  loginAsDeveloper: (customEmail?: string) => {
-    const email = customEmail || 'sara.dongare@corp-sec.com';
-    const mockDevUser = {
-      uid: 'dev-admin-override',
-      email,
-      displayName: 'Sara Dongare (SecOps Lead)',
-      emailVerified: true,
-      isAnonymous: false,
-    } as unknown as User;
-
-    set({
-      user: mockDevUser,
-      role: 'developer',
-      scansUsed: 0,
-      maxScans: -1,
-      isInitialized: true,
-      loading: false,
-    });
-  },
-
-  loginAsStandard: (customEmail?: string) => {
-    const email = customEmail || 'analyst.standard@enterprise.com';
-    const mockStandardUser = {
-      uid: 'user-standard-override',
-      email,
-      displayName: 'Standard Security Analyst',
-      emailVerified: true,
-      isAnonymous: false,
-    } as unknown as User;
-
-    set({
-      user: mockStandardUser,
-      role: 'user',
-      scansUsed: 0,
-      maxScans: 3,
-      isInitialized: true,
-      loading: false,
-    });
   },
 
   setupAuthListener: () => {

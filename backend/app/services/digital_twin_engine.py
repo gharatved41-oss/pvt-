@@ -209,6 +209,16 @@ class DigitalTwinEngine:
         twin_data["retest_completed"] = True
         twin_data["state"] = "REMEDIATED_AND_VERIFIED"
         twin_data["before_after"]["after"] = after_metrics
+        twin_data["before_after_delta"] = {
+            "before_risk_score": initial_risk,
+            "after_risk_score": new_risk,
+            "before_posture": initial_posture,
+            "after_posture": new_posture,
+            "posture_improvement_points": posture_delta,
+            "open_findings_before": len(findings),
+            "open_findings_after": 0,
+            "status": "VERIFIED_SAFE"
+        }
 
         return twin_data
 

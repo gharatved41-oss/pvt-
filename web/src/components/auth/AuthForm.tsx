@@ -1,226 +1,217 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider
-} from 'firebase/auth';
-import { Shield, Lock, Mail, ArrowRight, AlertCircle, RefreshCw, KeyRound, ShieldCheck, UserCheck } from 'lucide-react';
-import { auth } from '@/lib/firebase';
-import { useAuthStore } from '@/store/useAuthStore';
+import { Shield } from 'lucide-react';
+import {
+  signInWithGoogle,
+  signInWithApple,
+  loginWithEmail,
+  registerWithEmail,
+} from '@/lib/authService';
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 export function AuthForm() {
-  const { loginAsDeveloper, loginAsStandard } = useAuthStore();
-  const [mode, setMode] = useState<'signin' | 'register'>('signin');
+  const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [providerLoading, setProviderLoading] = useState<'google' | 'apple' | null>(null);
+  const [verificationSent, setVerificationSent] = useState(false);
 
-  // Email / Password Authentication
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    const cleanEmail = email.trim();
+    const cleanPassword = password;
+
+    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+      setError('auth/invalid-email: A valid email address is required. Bare numbers or identifiers are rejected.');
+      return;
+    }
+
+    if (!cleanPassword || cleanPassword.length < 6) {
+      setError('auth/weak-password: Password must contain at least 6 characters.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      if (mode === 'signin') {
-        await signInWithEmailAndPassword(auth, email.trim(), password);
+      if (isRegister) {
+        await registerWithEmail(cleanEmail, cleanPassword);
+        setVerificationSent(true);
       } else {
-        await createUserWithEmailAndPassword(auth, email.trim(), password);
+        await loginWithEmail(cleanEmail, cleanPassword);
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '';
-      if (
-        message.includes('auth/invalid-credential') || 
-        message.includes('auth/wrong-password') || 
-        message.includes('auth/user-not-found')
-      ) {
-        setError('Invalid credentials. Check your email and password, or use Developer Clearance below.');
-      } else if (message.includes('auth/email-already-in-use')) {
-        setError('This email is already registered. Please switch to Sign In.');
-      } else if (message.includes('auth/weak-password')) {
-        setError('Password must contain at least 6 characters.');
-      } else if (message.includes('auth/invalid-email')) {
-        setError('Please enter a valid corporate email format.');
-      } else if (message.includes('auth/too-many-requests')) {
-        setError('Too many failed attempts. Temporary security lockout active.');
-      } else {
-        setError(message || 'Authentication service error. Please try again.');
-      }
+      const errorWithCode = err as { code?: string; message?: string };
+      setError(errorWithCode?.code || errorWithCode?.message || 'auth/authentication-failed');
     } finally {
       setLoading(false);
     }
   };
 
-  // Google OAuth with fallback
   const handleGoogleSignIn = async () => {
     setError(null);
-    setLoading(true);
+    setProviderLoading('google');
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await signInWithGoogle();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('auth/operation-not-allowed') || msg.includes('auth/configuration-not-found')) {
-        setError('Google Provider is not enabled in Firebase Console. Logging in via verified SOC Analyst profile...');
-        setTimeout(() => {
-          loginAsStandard('analyst.google@enterprise.com');
-        }, 1200);
-      } else if (msg.includes('auth/popup-blocked')) {
-        setError('Popup blocked by browser. Please allow popups or use Developer Clearance below.');
-      } else if (msg.includes('auth/popup-closed-by-user')) {
-        setError('Sign-in cancelled by user.');
-      } else {
-        setError(msg || 'Google Authentication failed. Use email/password or Developer Clearance.');
-      }
+      const errorWithCode = err as { code?: string; message?: string };
+      setError(errorWithCode?.code || errorWithCode?.message || 'auth/google-sign-in-failed');
     } finally {
-      setLoading(false);
+      setProviderLoading(null);
     }
   };
 
+  const handleAppleSignIn = async () => {
+    setError(null);
+    setProviderLoading('apple');
+    try {
+      await signInWithApple();
+    } catch (err: unknown) {
+      const errorWithCode = err as { code?: string; message?: string };
+      setError(errorWithCode?.code || errorWithCode?.message || 'auth/apple-sign-in-failed');
+    } finally {
+      setProviderLoading(null);
+    }
+  };
+
+  const isAnyLoading = loading || providerLoading !== null;
+
   return (
-    <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-md p-6 shadow-none space-y-6 select-none font-sans">
-      {/* Brand Header */}
+    <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-none p-6 shadow-none space-y-6 select-none font-mono">
       <div className="text-center space-y-2">
-        <div className="inline-flex p-2.5 bg-zinc-950 border border-zinc-800 rounded-md text-emerald-400">
+        <div className="inline-flex p-2.5 bg-zinc-900 border border-zinc-800 rounded-none text-emerald-400">
           <Shield className="w-5 h-5" />
         </div>
-        <h2 className="text-base font-bold text-zinc-100 tracking-tight">
+        <h2 className="text-sm font-bold text-zinc-100 uppercase tracking-wider">
           VulnTwin AI
         </h2>
-        <p className="text-xs text-zinc-400 font-mono">
-          Adversarial Exposure Validation • Security Gateway
+        <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
+          Continuous Threat Exposure Management
         </p>
       </div>
 
-      {/* Mode Switcher */}
-      <div className="grid grid-cols-2 p-1 bg-zinc-950 border border-zinc-800 rounded-md text-xs font-mono">
-        <button
-          type="button"
-          onClick={() => { setMode('signin'); setError(null); }}
-          className={`py-1.5 rounded text-center transition-colors ${
-            mode === 'signin'
-              ? 'bg-zinc-800 text-zinc-100 font-semibold'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          Sign In
-        </button>
-        <button
-          type="button"
-          onClick={() => { setMode('register'); setError(null); }}
-          className={`py-1.5 rounded text-center transition-colors ${
-            mode === 'register'
-              ? 'bg-zinc-800 text-zinc-100 font-semibold'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          Create Account
-        </button>
-      </div>
-
-      {/* Red Error Message Block */}
-      {error && (
-        <div className="p-3 bg-red-950/70 border border-red-800/80 rounded-md text-xs text-red-300 flex items-start gap-2 font-mono">
-          <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
-          <span className="leading-snug">{error}</span>
+      {verificationSent ? (
+        <div className="space-y-4">
+          <div className="p-3 border border-emerald-800 bg-emerald-950/20 text-emerald-400 text-xs">
+            <span className="font-bold">[SUCCESS]: </span>
+            Verification email dispatched to {email}. Verify your inbox before logging in.
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setVerificationSent(false);
+              setIsRegister(false);
+              setError(null);
+            }}
+            className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 py-2 text-xs uppercase"
+          >
+            RETURN TO SIGN IN
+          </button>
         </div>
-      )}
+      ) : (
+        <>
+          <div className="grid grid-cols-2 p-1 bg-zinc-900 border border-zinc-800 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegister(false);
+                setError(null);
+              }}
+              className={`py-1.5 transition-colors uppercase ${
+                !isRegister ? 'bg-zinc-800 text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegister(true);
+                setError(null);
+              }}
+              className={`py-1.5 transition-colors uppercase ${
+                isRegister ? 'bg-zinc-800 text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              Register
+            </button>
+          </div>
 
-      {/* Email / Password Form */}
-      <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-        <div className="space-y-1.5">
-          <label className="text-zinc-400 font-mono flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Corporate Email</span>
-          </label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="analyst@enterprise.com"
-            className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 font-mono text-xs transition-colors"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-zinc-400 font-mono flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Password</span>
-          </label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••••••"
-            className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 font-mono text-xs transition-colors"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2 bg-zinc-100 hover:bg-white text-zinc-950 font-semibold rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-        >
-          {loading ? (
-            <RefreshCw className="w-4 h-4 animate-spin text-zinc-800" />
-          ) : (
-            <>
-              <span>{mode === 'signin' ? 'Authenticate Session' : 'Register Account'}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </>
+          {error && (
+            <div className="p-2.5 bg-red-950/20 border border-red-500 text-red-400 text-xs break-all">
+              <span className="font-bold">[ERROR]:</span> {error}
+            </div>
           )}
-        </button>
-      </form>
 
-      {/* Alternative Sign-In Options */}
-      <div className="space-y-3 pt-1 border-t border-zinc-800">
-        {/* Google OAuth Button */}
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={loading}
-          className="w-full py-2 bg-zinc-950 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 font-medium rounded-md text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.9C6.5 7.4 9 5 12 5z"/>
-            <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
-            <path fill="#FBBC05" d="M5.6 14.7c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.2C.7 9.6 0 12.2 0 15s.7 5.4 1.9 7.8l3.7-3.1z"/>
-            <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2-6.4-4.8L1.9 16.4C3.7 20.2 7.5 23 12 23z"/>
-          </svg>
-          <span>Continue with Google</span>
-        </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              disabled={isAnyLoading}
+              onClick={handleGoogleSignIn}
+              className="w-full bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-200 text-xs py-2 px-3 flex items-center justify-center gap-2 uppercase tracking-wider transition-colors disabled:opacity-50"
+            >
+              <span>{providerLoading === 'google' ? 'AUTHENTICATING...' : 'CONTINUE WITH GOOGLE'}</span>
+            </button>
 
-        {/* 100% Reliable Role Switches: Developer Clearance & Standard SOC Analyst */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => loginAsDeveloper()}
-            className="p-2.5 bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-800/70 text-emerald-300 font-mono rounded-md text-[11px] flex flex-col items-center justify-center text-center transition-colors cursor-pointer"
-            title="Instant Developer Clearance (Bypasses external auth barriers)"
-          >
-            <ShieldCheck className="w-4 h-4 text-emerald-400 mb-0.5" />
-            <span className="font-semibold">Developer Access</span>
-            <span className="text-[9px] text-emerald-500/80">Admin Controls Active</span>
-          </button>
+            <button
+              type="button"
+              disabled={isAnyLoading}
+              onClick={handleAppleSignIn}
+              className="w-full bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-200 text-xs py-2 px-3 flex items-center justify-center gap-2 uppercase tracking-wider transition-colors disabled:opacity-50"
+            >
+              <span>{providerLoading === 'apple' ? 'AUTHENTICATING...' : 'CONTINUE WITH APPLE'}</span>
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => loginAsStandard()}
-            className="p-2.5 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-mono rounded-md text-[11px] flex flex-col items-center justify-center text-center transition-colors cursor-pointer"
-            title="Standard User Tier (3 scans/day)"
-          >
-            <UserCheck className="w-4 h-4 text-zinc-400 mb-0.5" />
-            <span className="font-semibold">Standard Access</span>
-            <span className="text-[9px] text-zinc-500">Standard Tier</span>
-          </button>
-        </div>
-      </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-[10px] text-zinc-400 uppercase tracking-wider mb-1">
+                CORPORATE EMAIL
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="analyst@enterprise.com"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-none py-1.5 px-3 text-xs text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] text-zinc-400 uppercase tracking-wider mb-1">
+                ACCESS KEY
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-none py-1.5 px-3 text-xs text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isAnyLoading}
+              className="w-full bg-zinc-100 hover:bg-white text-zinc-950 font-bold py-2 text-xs uppercase tracking-wider rounded-none transition-colors disabled:opacity-50"
+            >
+              {loading
+                ? 'PROCESSING...'
+                : isRegister
+                ? 'PROVISION ACCOUNT'
+                : 'VERIFY CREDENTIALS'}
+            </button>
+          </form>
+        </>
+      )}
     </div>
   );
 }
