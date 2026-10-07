@@ -28,6 +28,7 @@ export default function MainPage() {
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
   const [targetAction, setTargetAction] = useState<string>('');
   const [viewMode, setViewMode] = useState<'landing' | 'sandbox'>('landing');
+  const [verificationError, setVerificationError] = useState<string | null>(null);
 
   // 1. Initialize Auth and Session Intro Check
   useEffect(() => {
@@ -52,15 +53,19 @@ export default function MainPage() {
   // 2. Action Gating Interceptor
   const handleActionClick = (actionName: string) => {
     setTargetAction(actionName);
+    setVerificationError(null);
 
+    // If not logged in, trigger AuthModal
     if (!user) {
       setAuthModalOpen(true);
       return;
     }
 
-    // Standard users must be email-verified before accessing sandbox
+    // If logged in but email not verified (and not developer), display verification alert
     if (!isDeveloper && !user.emailVerified) {
-      setAuthModalOpen(true);
+      setVerificationError(
+        'Access Restricted: Please verify your email address to launch the Digital Twin simulation.'
+      );
       return;
     }
 
@@ -75,6 +80,7 @@ export default function MainPage() {
   };
 
   const handleAuthSuccess = () => {
+    setVerificationError(null);
     setViewMode('sandbox');
   };
 
@@ -87,6 +93,23 @@ export default function MainPage() {
             setShowSplash(false);
           }}
         />
+      )}
+
+      {/* Email Verification Required Banner */}
+      {verificationError && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[90%] bg-zinc-950 border border-red-500 text-red-400 font-mono text-xs p-3 flex items-center justify-between shadow-2xl">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-red-500">[VERIFICATION_REQUIRED]:</span>
+            <span>{verificationError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVerificationError(null)}
+            className="ml-3 text-zinc-500 hover:text-zinc-300 font-bold uppercase"
+          >
+            [DISMISS]
+          </button>
+        </div>
       )}
 
       {/* Module 3: Authentication Modal */}
