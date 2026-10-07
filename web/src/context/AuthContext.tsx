@@ -33,7 +33,6 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<UserCredential>;
   signOut: () => Promise<void>;
   logout: () => Promise<void>;
-  demoLogin: (role?: UserRole) => void;
   incrementScanCount: () => Promise<number>;
   refreshUserData: () => Promise<void>;
 }
@@ -155,25 +154,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setScansUsed(0);
   };
 
-  const demoLogin = (selectedRole: UserRole = 'developer') => {
-    const isDev = selectedRole === 'developer';
-    const mockUser = {
-      uid: 'demo-' + (isDev ? 'dev-' : 'user-') + Math.random().toString(36).substring(2, 9),
-      email: isDev ? 'sara.dongare@corp-sec.com' : 'analyst.standard@enterprise.com',
-      displayName: isDev ? 'Principal Security Engineer' : 'Standard SOC Analyst',
-      role: selectedRole,
-      scansUsed: 0,
-      isAnonymous: false,
-    };
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('vulntwin_active_user', JSON.stringify(mockUser));
-    }
-    setUser(mockUser as unknown as User);
-    setRole(selectedRole);
-    setScansUsed(0);
-  };
-
   const incrementScanCount = async (): Promise<number> => {
     const nextCount = scansUsed + 1;
     setScansUsed(nextCount);
@@ -220,7 +200,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signOut,
         logout: signOut,
-        demoLogin,
         incrementScanCount,
         refreshUserData,
       }}

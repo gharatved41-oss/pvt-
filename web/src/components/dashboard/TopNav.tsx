@@ -2,11 +2,11 @@
 
 import React from 'react';
 import { Shield, Play, RotateCcw, LogOut, User as UserIcon, RefreshCw } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useTwinStore } from '@/store/useTwinStore';
 
 export function TopNav() {
-  const { user, logout } = useAuth();
+  const { user, signOut: logout } = useAuthStore();
   const { 
     simulationState, 
     simulationProgress, 
