@@ -24,7 +24,6 @@ export default function MainPage() {
     riskScore,
   } = useTwinStore();
 
-  const [hasSeenIntro, setHasSeenIntro] = useState<boolean>(true); // start true for SSR safety
   const [showSplash, setShowSplash] = useState<boolean>(false);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
   const [targetAction, setTargetAction] = useState<string>('');

@@ -50,6 +50,19 @@ export function AuthModal({
   const [resendCooldown, setResendCooldown] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialPendingVerification || (user && role !== 'developer' && !user.emailVerified)) {
+        setVerificationPending(true);
+        setRegisteredEmail(user?.email || '');
+      } else {
+        setVerificationPending(false);
+      }
+      setError(null);
+      setResendMessage(null);
+    }
+  }, [isOpen, initialPendingVerification, user, role]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -246,10 +259,15 @@ export function AuthModal({
 
               <button
                 type="button"
-                onClick={() => setVerificationPending(false)}
+                onClick={async () => {
+                  setVerificationPending(false);
+                  if (user && !user.emailVerified && role !== 'developer') {
+                    await useAuthStore.getState().signOut();
+                  }
+                }}
                 className="w-full text-center text-[10px] text-zinc-500 hover:text-zinc-300 pt-2"
               >
-                Return to Sign In
+                Sign In with Different Account
               </button>
             </div>
           </div>
