@@ -11,17 +11,15 @@ import { TerminalFeed } from '@/components/twin/TerminalFeed';
 import { RemediationPanel } from '@/components/twin/RemediationPanel';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTwinStore } from '@/store/useTwinStore';
+import { useTwinEngine } from '@/store/useTwinEngine';
 import { Play, RefreshCw, ShieldAlert, Layers, Home, Eye } from 'lucide-react';
 
 export default function MainPage() {
   const { user, role, scansUsed, maxScans } = useAuthStore();
+  const twinEngine = useTwinEngine();
   const {
-    simulationStatus,
-    simulationProgress,
-    runValidation,
     selectedTemplate,
     loadTemplate,
-    riskScore,
   } = useTwinStore();
 
   const [showSplash, setShowSplash] = useState<boolean>(false);
@@ -41,7 +39,7 @@ export default function MainPage() {
   }, []);
 
   const isDeveloper = role === 'developer';
-  const isRunning = simulationStatus === 'RUNNING';
+  const isRunning = twinEngine.isSimulating;
   const isQuotaReached = !isDeveloper && scansUsed >= maxScans;
 
   // 2. Action Gating Interceptor
@@ -185,39 +183,31 @@ export default function MainPage() {
 
                 {/* Compound Risk & Run Button */}
                 <div className="flex items-center gap-3">
-                  {riskScore > 0 && (
+                  {twinEngine.blastRadius > 0 && (
                     <div className="flex items-center gap-1.5 text-[11px]">
-                      <span className="text-zinc-500">Compound Risk:</span>
-                      <span
-                        className={`font-bold px-1.5 py-0.5 rounded border ${
-                          riskScore >= 80
-                            ? 'bg-red-950 text-red-400 border-red-800'
-                            : riskScore >= 50
-                            ? 'bg-amber-950 text-amber-400 border-amber-800'
-                            : 'bg-emerald-950 text-emerald-400 border-emerald-800'
-                        }`}
-                      >
-                        {riskScore} / 100
+                      <span className="text-zinc-500 uppercase">Blast Radius:</span>
+                      <span className="font-bold px-1.5 py-0.5 rounded-none border bg-red-950 text-red-400 border-red-800">
+                        {twinEngine.blastRadius} / 100
                       </span>
                     </div>
                   )}
 
                   <button
                     type="button"
-                    disabled={isRunning || isQuotaReached}
-                    onClick={() => runValidation()}
-                    className={`px-3 py-1 rounded font-semibold text-xs flex items-center gap-1.5 transition-all ${
+                    disabled={twinEngine.isSimulating || isQuotaReached}
+                    onClick={() => twinEngine.startSimulation()}
+                    className={`px-3 py-1 rounded-none font-bold text-xs flex items-center gap-1.5 transition-all uppercase ${
                       isQuotaReached
                         ? 'bg-zinc-900 text-red-400 border border-red-900 cursor-not-allowed'
-                        : isRunning
+                        : twinEngine.isSimulating
                         ? 'bg-zinc-800 text-zinc-400 border border-zinc-700 cursor-not-allowed'
                         : 'bg-zinc-100 hover:bg-white text-zinc-950 cursor-pointer active:scale-98'
                     }`}
                   >
-                    {isRunning ? (
+                    {twinEngine.isSimulating ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                        <span>Validating ({simulationProgress}%)...</span>
+                        <span>Traversing Graph...</span>
                       </>
                     ) : isQuotaReached ? (
                       <>

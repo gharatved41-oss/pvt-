@@ -1,62 +1,150 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, memo } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   MarkerType,
-  Node,
-  Edge,
+  Node as FlowNode,
+  Edge as FlowEdge,
+  Handle,
+  Position,
+  NodeProps,
   ConnectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useTwinStore } from '@/store/useTwinStore';
-import { AssetNode } from './AssetNode';
+import { useTwinEngine, Node as EngineNode, NodeStatus } from '@/store/useTwinEngine';
+
+interface AustereNodeData {
+  node: EngineNode;
+  [key: string]: unknown;
+}
+
+/**
+ * Austere Node Component
+ * - Pure dark mode: bg-zinc-950, border-zinc-800
+ * - If compromised: border-red-500
+ * - If patched: border-emerald-500
+ * - If probing: border-amber-500
+ */
+const AustereNode = memo(({ data, selected }: NodeProps) => {
+  const node = (data as unknown as AustereNodeData).node;
+
+  const getBorderColor = (status: NodeStatus) => {
+    switch (status) {
+      case 'compromised':
+        return 'border-red-500 text-red-400';
+      case 'patched':
+        return 'border-emerald-500 text-emerald-400';
+      case 'probing':
+        return 'border-amber-500 text-amber-400';
+      case 'healthy':
+      default:
+        return 'border-zinc-800 text-zinc-300';
+    }
+  };
+
+  const getStatusBadge = (status: NodeStatus) => {
+    switch (status) {
+      case 'compromised':
+        return <span className="text-red-500 font-bold">[COMPROMISED]</span>;
+      case 'patched':
+        return <span className="text-emerald-400 font-bold">[PATCHED]</span>;
+      case 'probing':
+        return <span className="text-amber-400 font-bold animate-pulse">[PROBING]</span>;
+      case 'healthy':
+      default:
+        return <span className="text-zinc-500">[HEALTHY]</span>;
+    }
+  };
+
+  const statusClass = getBorderColor(node.status);
+
+  return (
+    <div
+      className={`w-64 bg-zinc-950 border ${statusClass} rounded-none p-3.5 font-mono select-none transition-colors duration-150 ${
+        selected ? 'ring-1 ring-zinc-400' : ''
+      }`}
+    >
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="w-2 h-2 !bg-zinc-700 !border !border-zinc-950 rounded-none"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="w-2 h-2 !bg-zinc-700 !border !border-zinc-950 rounded-none"
+      />
+
+      <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-900 text-[10px]">
+        <span className="text-zinc-500 uppercase tracking-widest">{node.type}</span>
+        {getStatusBadge(node.status)}
+      </div>
+
+      <div className="text-xs font-bold text-zinc-100 uppercase tracking-tight mb-2">
+        {node.label}
+      </div>
+
+      <div className="space-y-1 text-[11px] text-zinc-400">
+        <div className="flex justify-between">
+          <span className="text-zinc-600">IP:</span>
+          <span className="text-zinc-200">{node.ip}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-zinc-600">CRITICALITY:</span>
+          <span className="text-amber-400 font-bold">{node.criticality}/10</span>
+        </div>
+        {node.cve && (
+          <div className="flex justify-between">
+            <span className="text-zinc-600">VULN:</span>
+            <span className="text-red-400 font-bold">{node.cve}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+AustereNode.displayName = 'AustereNode';
 
 const nodeTypes = {
-  assetNode: AssetNode,
+  austereNode: AustereNode,
 };
 
 export function GraphCanvas() {
-  const { nodes: twinNodes, edges: twinEdges, selectNode } = useTwinStore();
+  const { nodes: engineNodes, edges: engineEdges, selectNode } = useTwinEngine();
 
-  // Convert Zustand nodes into XYFlow Node format
-  const flowNodes: Node[] = useMemo(() => {
-    return twinNodes.map((node) => ({
+  // Map Zustand nodes into React Flow format
+  const flowNodes: FlowNode[] = useMemo(() => {
+    return engineNodes.map((node) => ({
       id: node.id,
-      type: 'assetNode',
+      type: 'austereNode',
       position: node.position || { x: 100, y: 100 },
-      data: { ...node },
+      data: { node } as AustereNodeData,
     }));
-  }, [twinNodes]);
+  }, [engineNodes]);
 
-  // Convert Zustand edges into XYFlow Edge format with dynamic path states
-  const flowEdges: Edge[] = useMemo(() => {
-    return twinEdges.map((edge) => {
-      const srcNode = twinNodes.find((n) => n.id === edge.source);
-      const tgtNode = twinNodes.find((n) => n.id === edge.target);
-
-      const isTraversed = edge.isTraversed;
+  // Map Zustand edges into React Flow format
+  const flowEdges: FlowEdge[] = useMemo(() => {
+    return engineEdges.map((edge) => {
       const isBlocked = edge.accessState === 'blocked';
-      const isCompromised = tgtNode?.status === 'compromised';
-      const isPatched = tgtNode?.status === 'patched';
+      const isTraversed = edge.isTraversed;
 
-      let strokeColor = '#3f3f46'; // zinc-700
-      if (isBlocked) strokeColor = '#71717a'; // zinc-500
-      else if (isPatched) strokeColor = '#10b981'; // emerald-500
-      else if (isCompromised || isTraversed) strokeColor = '#ef4444'; // red-500
-      else if (tgtNode?.status === 'probing') strokeColor = '#f59e0b'; // amber-500
+      let strokeColor = '#27272a'; // zinc-800
+      if (isBlocked) strokeColor = '#52525b'; // zinc-600
+      else if (isTraversed) strokeColor = '#ef4444'; // red-500
 
       return {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        animated: isTraversed && !isBlocked && !isPatched,
-        label: isBlocked ? 'BLOCKED :5432' : edge.label,
+        animated: isTraversed && !isBlocked,
+        label: isBlocked ? `BLOCKED :${edge.port}` : `:${edge.port}`,
         labelStyle: {
-          fill: isBlocked ? '#71717a' : isTraversed ? '#fca5a5' : '#a1a1aa',
-          fontWeight: 600,
+          fill: isBlocked ? '#71717a' : isTraversed ? '#f87171' : '#a1a1aa',
+          fontWeight: 700,
           fontSize: '10px',
           fontFamily: 'monospace',
         },
@@ -64,26 +152,24 @@ export function GraphCanvas() {
           fill: '#09090b',
           stroke: isBlocked ? '#3f3f46' : isTraversed ? '#7f1d1d' : '#27272a',
           strokeWidth: 1,
-          rx: 4,
-          ry: 4,
         },
         style: {
           stroke: strokeColor,
-          strokeWidth: isTraversed ? 2.5 : 1.5,
+          strokeWidth: isTraversed ? 2 : 1.5,
           strokeDasharray: isBlocked ? '4 4' : undefined,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: strokeColor,
-          width: 14,
-          height: 14,
+          width: 12,
+          height: 12,
         },
       };
     });
-  }, [twinEdges, twinNodes]);
+  }, [engineEdges]);
 
   return (
-    <div className="w-full h-full relative bg-zinc-950 flex flex-col min-h-0">
+    <div className="w-full h-full relative bg-zinc-950 flex flex-col min-h-0 select-none">
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
@@ -92,16 +178,16 @@ export function GraphCanvas() {
         onPaneClick={() => selectNode(null)}
         connectionMode={ConnectionMode.Loose}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 0.25 }}
         minZoom={0.4}
         maxZoom={1.5}
         proOptions={{ hideAttribution: true }}
         className="bg-zinc-950"
       >
-        <Background color="#27272a" gap={20} size={1} />
+        <Background color="#18181b" gap={20} size={1} />
         <Controls
           showInteractive={false}
-          className="!bg-zinc-900 !border-zinc-800 !rounded !text-zinc-300 [&>button]:!border-zinc-800 [&>button]:!bg-zinc-900 [&>button:hover]:!bg-zinc-800"
+          className="!bg-zinc-950 !border-zinc-800 !rounded-none !text-zinc-400 [&>button]:!border-zinc-800 [&>button]:!bg-zinc-950 [&>button:hover]:!bg-zinc-900"
         />
       </ReactFlow>
     </div>
