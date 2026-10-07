@@ -1,0 +1,147 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // HELPER FUNCTIONS & RBAC ENFORCEMENT
+    // =========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDeveloper() {
+      return isAuthenticated() && 
+        request.auth.token.role == 'developer';
+    }
+
+    function isPro() {
+      return isAuthenticated() && 
+        (request.auth.token.role == 'pro' || request.auth.token.role == 'developer');
+    }
+
+    // =========================================================================
+    // COLLECTION: /users/{userId}
+    // Users can read/update their own profile data, but CANNOT alter 'role' or 'scanUsage'.
+    // Only backend Cloud Functions or Developers can alter RBAC claims/quotas.
+    // =========================================================================
+    match /users/{userId} {
+      // Developers can read any user profile; users can only read their own
+      allow read: if isDeveloper() || isOwner(userId);
+
+      // Initial user profile creation (e.g. on client sign-up)
+      // Must not allow setting privileged 'role' or 'scanUsage'
+      allow create: if isDeveloper() || (
+        isOwner(userId) &&
+        (!request.resource.data.keys().hasAny(['role', 'scanUsage']) ||
+         (request.resource.data.role == 'user' && 
+          request.resource.data.scanUsage.currentDayCount == 0 &&
+          request.resource.data.scanUsage.currentMonthCount == 0))
+      );
+
+      // Updates: Non-developers CANNOT tamper with 'role' or 'scanUsage'
+      allow update: if isDeveloper() || (
+        isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'scanUsage'])
+      );
+
+      // Deletions strictly restricted to developers
+      allow delete: if isDeveloper();
+    }
+
+    // =========================================================================
+    // COLLECTION: /environments/{envId}
+    // Tenant-isolated target environment configurations.
+    // =========================================================================
+    match /environments/{envId} {
+      // Developers have universal visibility; non-developers see only their own environments
+      allow read: if isDeveloper() || 
+        (isAuthenticated() && resource.data.ownerId == request.auth.uid);
+
+      // Create: Authenticated users must bind themselves as the owner
+      allow create: if isDeveloper() || (
+        isAuthenticated() && 
+        request.resource.data.ownerId == request.auth.uid &&
+        request.resource.data.status in ['idle', 'cloning', 'ready']
+      );
+
+      // Update / Delete: Only the owner or a developer
+      allow update: if isDeveloper() || (
+        isAuthenticated() && 
+        resource.data.ownerId == request.auth.uid &&
+        request.resource.data.ownerId == request.auth.uid
+      );
+
+      allow delete: if isDeveloper() || (
+        isAuthenticated() && 
+        resource.data.ownerId == request.auth.uid
+      );
+    }
+
+    // =========================================================================
+    // COLLECTION: /simulations/{simId}
+    // Digital Twin simulations and validation runs.
+    // =========================================================================
+    match /simulations/{simId} {
+      // Developers have universal access; users see only simulations they initiated
+      allow read: if isDeveloper() || (
+        isAuthenticated() && 
+        resource.data.initiatedBy == request.auth.uid
+      );
+
+      // Direct client creation is blocked or strictly validated; 
+      // Primary initiation happens via the secure `initiateScan` Cloud Function.
+      allow create: if isDeveloper() || (
+        isAuthenticated() &&
+        request.resource.data.initiatedBy == request.auth.uid &&
+        request.resource.data.status == 'queued'
+      );
+
+      // Updates (status changes, exploit outcomes) reserved for developers & service roles
+      allow update: if isDeveloper();
+      allow delete: if isDeveloper();
+
+      // Real-time telemetry events streamed by BAS engine
+      match /events/{eventId} {
+        allow read: if isAuthenticated();
+        allow write: if isDeveloper();
+      }
+    }
+
+    // =========================================================================
+    // COLLECTION: /digital_twins/{twinId}
+    // Real-Time Graph Sandbox: Nodes, Edges, and Attack Heartbeats.
+    // =========================================================================
+    match /digital_twins/{twinId} {
+      allow read: if isAuthenticated();
+      allow write: if isDeveloper();
+
+      match /nodes/{nodeId} {
+        allow read: if isAuthenticated();
+        allow write: if isDeveloper();
+
+        match /synthetic_records/{recordId} {
+          allow read: if isAuthenticated();
+          allow write: if isDeveloper();
+        }
+      }
+
+      match /edges/{edgeId} {
+        allow read: if isAuthenticated();
+        allow write: if isDeveloper();
+      }
+    }
+
+    // =========================================================================
+    // DEFAULT CATCH-ALL: ZERO TRUST DENY
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

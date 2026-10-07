@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+*/node_modules/
+web/node_modules/
+frontend/node_modules/
+functions/node_modules/
+
+# Next.js & Build outputs
+.next/
+.firebase/
+web/.next/
+web/out/
+frontend/dist/
+dist/
+build/
+functions/lib/
+
+# Python
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+.venv/
+env/
+
+# Environment Variables & Credentials
+.env
+.env.local
+.env.*.local
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+firebase-debug.log
+firebase-debug.*.log
+
+# Local Databases
+autosectwin.db
+*.sqlite3
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
