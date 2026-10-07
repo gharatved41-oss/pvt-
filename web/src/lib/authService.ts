@@ -6,19 +6,23 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   User,
+  UserCredential,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db, ADMIN_EMAILS } from './firebase';
 import { useAuthStore, UserRole } from '@/store/useAuthStore';
 
 /**
- * Sync user profile to Firestore ensuring role and metadata persistence
+ * RBAC Profile Synchronizer
+ * 1. Checks if user email matches NEXT_PUBLIC_ADMIN_EMAIL or pre-configured developer accounts.
+ * 2. Reads role from Firestore /users/{uid}.
+ * 3. Developer accounts bypass email verification and scan quotas automatically.
  */
 export async function syncUserProfile(user: User): Promise<UserRole> {
   const email = (user.email || '').toLowerCase().trim();
   const adminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim();
 
-  const isDeveloper =
+  const isDeveloperEmail =
     (adminEmail && email === adminEmail) ||
     email === 'your_email@gmail.com' ||
     email === 'sara.dongare@corp-sec.com' ||
@@ -26,108 +30,129 @@ export async function syncUserProfile(user: User): Promise<UserRole> {
     email.includes('developer') ||
     ADMIN_EMAILS.some((adm) => adm.toLowerCase() === email);
 
-  const defaultRole: UserRole = isDeveloper ? 'developer' : 'user';
+  let assignedRole: UserRole = isDeveloperEmail ? 'developer' : 'user';
 
-  if (!db) return defaultRole;
+  if (!db) {
+    useAuthStore.getState().setSession(user, assignedRole);
+    return assignedRole;
+  }
 
   try {
     const userRef = doc(db, 'users', user.uid);
     const snap = await getDoc(userRef);
 
     if (!snap.exists()) {
+      // First login / register: Create Firestore profile
       await setDoc(userRef, {
-        uid: user.uid,
         email: user.email,
-        role: defaultRole,
-        emailVerified: user.emailVerified || isDeveloper,
-        createdAt: new Date().toISOString(),
+        role: assignedRole,
         scansUsed: 0,
-        maxScans: defaultRole === 'developer' ? -1 : 3,
-        activeTwinId: 'ecommerce',
+        createdAt: new Date().toISOString(),
       });
-      return defaultRole;
     } else {
       const data = snap.data();
-      let role: UserRole = (data?.role as UserRole) || defaultRole;
-
-      if (isDeveloper && role !== 'developer') {
-        role = 'developer';
-        await updateDoc(userRef, { role: 'developer', maxScans: -1 });
+      // If Firestore document already has role === 'developer', preserve it
+      if (data?.role === 'developer' || isDeveloperEmail) {
+        assignedRole = 'developer';
+        if (data?.role !== 'developer') {
+          await updateDoc(userRef, { role: 'developer' });
+        }
+      } else {
+        assignedRole = (data?.role as UserRole) || 'user';
       }
-
-      await updateDoc(userRef, {
-        emailVerified: user.emailVerified || role === 'developer',
-        lastLoginAt: new Date().toISOString(),
-      });
-
-      return role;
     }
+
+    useAuthStore.getState().setSession(user, assignedRole);
+    return assignedRole;
   } catch (err) {
-    console.warn('Firestore user profile sync warning:', err);
-    return defaultRole;
+    console.warn('Firestore profile sync warning:', err);
+    useAuthStore.getState().setSession(user, assignedRole);
+    return assignedRole;
   }
 }
 
 /**
- * 1. Google OAuth Provider
+ * 1. Google Sign-In
  */
-export const signInWithGoogle = async () => {
+export const signInWithGoogle = async (): Promise<UserCredential> => {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const result = await signInWithPopup(auth, provider);
-  const role = await syncUserProfile(result.user);
-  useAuthStore.getState().setSession(result.user, role);
-  return result.user;
+  const cred = await signInWithPopup(auth, provider);
+  await syncUserProfile(cred.user);
+  return cred;
 };
 
 /**
- * 2. Apple OAuth Provider
+ * 2. Apple Sign-In
  */
-export const signInWithApple = async () => {
+export const signInWithApple = async (): Promise<UserCredential> => {
   const provider = new OAuthProvider('apple.com');
   provider.addScope('email');
   provider.addScope('name');
-  const result = await signInWithPopup(auth, provider);
-  const role = await syncUserProfile(result.user);
-  useAuthStore.getState().setSession(result.user, role);
-  return result.user;
+  const cred = await signInWithPopup(auth, provider);
+  await syncUserProfile(cred.user);
+  return cred;
 };
 
 /**
- * 3. Email Registration with Automated Verification Link
+ * 3. Email Registration & Verification Flow
  */
-export const registerWithEmail = async (email: string, pass: string) => {
-  const cred = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), pass);
-  
-  // Dispatch confirmation link immediately
+export const registerWithEmail = async (email: string, pass: string): Promise<UserCredential> => {
+  const cleanEmail = email.trim().toLowerCase();
+  const cred = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+
+  // Immediately dispatch email confirmation link
   await sendEmailVerification(cred.user);
 
-  const role = await syncUserProfile(cred.user);
-  useAuthStore.getState().setSession(cred.user, role);
-  return cred.user;
+  // Create user document in Firestore under /users/{uid}
+  if (db) {
+    try {
+      const userRef = doc(db, 'users', cred.user.uid);
+      const adminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim();
+      const isDev =
+        (adminEmail && cleanEmail === adminEmail) ||
+        cleanEmail === 'your_email@gmail.com' ||
+        cleanEmail.includes('admin') ||
+        cleanEmail.includes('developer');
+
+      const initialRole: UserRole = isDev ? 'developer' : 'user';
+
+      await setDoc(userRef, {
+        email: cred.user.email,
+        role: initialRole,
+        scansUsed: 0,
+        createdAt: new Date().toISOString(),
+      });
+
+      useAuthStore.getState().setSession(cred.user, initialRole);
+    } catch (err) {
+      console.warn('Firestore user doc creation error:', err);
+    }
+  }
+
+  return cred;
 };
 
 /**
  * 4. Email Sign-In
  */
-export const loginWithEmail = async (email: string, pass: string) => {
+export const loginWithEmail = async (email: string, pass: string): Promise<UserCredential> => {
   const cred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), pass);
-  const role = await syncUserProfile(cred.user);
-  useAuthStore.getState().setSession(cred.user, role);
-  return cred.user;
+  await syncUserProfile(cred.user);
+  return cred;
 };
 
 /**
  * 5. Resend Verification Email
  */
-export const resendVerificationEmail = async (user?: User | null) => {
+export const resendVerificationEmail = async (user?: User | null): Promise<void> => {
   const currentUser = user || auth.currentUser;
   if (!currentUser) throw new Error('No active user session to dispatch verification email.');
   await sendEmailVerification(currentUser);
 };
 
 /**
- * 6. Reload User to verify updated emailVerified token
+ * 6. Reload User Session (to check updated emailVerified status)
  */
 export const reloadUserSession = async (): Promise<boolean> => {
   if (!auth.currentUser) return false;
