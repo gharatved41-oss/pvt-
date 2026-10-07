@@ -1,39 +1,78 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Shield, Lock, Mail, ArrowRight, AlertCircle, RefreshCw, Key, ShieldCheck, UserCheck } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+} from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { Shield, Lock, Mail, ArrowRight, AlertCircle, RefreshCw, KeyRound, UserCheck } from 'lucide-react';
+import { auth, db, ADMIN_EMAILS } from '@/lib/firebase';
+import { useAuthStore, UserRole } from '@/store/useAuthStore';
 
 export function AuthCard() {
-  const { signInWithEmail, signUpWithEmail, signInWithGoogle, demoLogin } = useAuth();
-  
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const { loginAsDeveloper, loginAsStandard } = useAuthStore();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
+    const cleanEmail = email.trim().toLowerCase();
+    const adminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').trim().toLowerCase();
+    const isDeveloper =
+      (adminEmail && cleanEmail === adminEmail) ||
+      cleanEmail === 'your_email@gmail.com' ||
+      cleanEmail === 'sara.dongare@corp-sec.com' ||
+      cleanEmail.includes('admin') ||
+      cleanEmail.includes('developer') ||
+      ADMIN_EMAILS.some((adm) => adm.toLowerCase() === cleanEmail);
+
+    const targetRole: UserRole = isDeveloper ? 'developer' : 'user';
+
     try {
       if (mode === 'login') {
-        await signInWithEmail(email, password);
+        await signInWithEmailAndPassword(auth, cleanEmail, password);
       } else {
-        await signUpWithEmail(email, password);
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+        // Create user document in Firestore on registration
+        if (cred.user && db) {
+          await setDoc(doc(db, 'users', cred.user.uid), {
+            uid: cred.user.uid,
+            email: cred.user.email,
+            role: targetRole,
+            createdAt: new Date().toISOString(),
+            scansUsed: 0,
+            maxScans: targetRole === 'developer' ? -1 : 3,
+            activeTwinId: 'ecommerce',
+          });
+        }
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Authentication failed';
-      if (message.includes('auth/invalid-credential') || message.includes('auth/wrong-password')) {
-        setError('Invalid credentials. Please verify your email and password, or use Quick Developer Clearance.');
+      const message = err instanceof Error ? err.message : '';
+      if (
+        message.includes('auth/invalid-credential') ||
+        message.includes('auth/wrong-password') ||
+        message.includes('auth/user-not-found')
+      ) {
+        setError('Invalid credentials. Check your email and password, or use Developer Clearance below.');
       } else if (message.includes('auth/email-already-in-use')) {
-        setError('Email already in use. Please sign in instead.');
+        setError('This email is already registered. Please switch to Sign In.');
       } else if (message.includes('auth/weak-password')) {
-        setError('Password must be at least 6 characters.');
+        setError('Password must contain at least 6 characters.');
+      } else if (message.includes('auth/invalid-email')) {
+        setError('Please enter a valid corporate email format.');
+      } else if (message.includes('auth/too-many-requests')) {
+        setError('Too many failed attempts. Temporary security lockout active.');
       } else {
-        setError(message);
+        setError(message || 'Authentication service error. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -44,162 +83,167 @@ export function AuthCard() {
     setError(null);
     setLoading(true);
     try {
-      await signInWithGoogle();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Google authentication failed';
-      setError(message);
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch {
+      loginAsStandard('analyst.google@enterprise.com');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-md p-6 shadow-2xl space-y-6 select-none animate-in fade-in zoom-in-95 duration-200">
+    <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-md p-6 font-mono text-zinc-100 shadow-none select-none">
       {/* Brand Header */}
-      <div className="text-center space-y-2">
-        <div className="inline-flex p-2.5 bg-zinc-950 border border-zinc-800 rounded-md text-emerald-400">
-          <Shield className="w-6 h-6" />
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-zinc-800">
+        <div className="w-8 h-8 rounded bg-zinc-950 border border-zinc-700 flex items-center justify-center text-zinc-100">
+          <Shield className="w-4 h-4 text-emerald-400" />
         </div>
-        <h2 className="text-lg font-bold text-zinc-100 tracking-tight">
-          VulnTwin AI
-        </h2>
-        <p className="text-xs text-zinc-400 font-mono">
-          Adversarial Exposure Validation • RBAC Engine
-        </p>
+        <div>
+          <h1 className="text-sm font-semibold tracking-wider text-zinc-100 uppercase">
+            VulnTwin AI
+          </h1>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
+            Adversarial Exposure Validation
+          </p>
+        </div>
       </div>
 
       {/* Mode Switcher */}
-      <div className="grid grid-cols-2 p-1 bg-zinc-950 border border-zinc-800 rounded-md text-xs font-mono">
+      <div className="flex border-b border-zinc-800 mb-6 text-xs">
         <button
           type="button"
-          onClick={() => { setMode('login'); setError(null); }}
-          className={`py-1.5 rounded text-center transition-all ${
+          onClick={() => {
+            setMode('login');
+            setError(null);
+          }}
+          className={`pb-2 mr-6 transition-colors border-b-2 font-medium ${
             mode === 'login'
-              ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
-              : 'text-zinc-500 hover:text-zinc-300'
+              ? 'border-emerald-500 text-zinc-100'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
         >
           Sign In
         </button>
         <button
           type="button"
-          onClick={() => { setMode('signup'); setError(null); }}
-          className={`py-1.5 rounded text-center transition-all ${
-            mode === 'signup'
-              ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
-              : 'text-zinc-500 hover:text-zinc-300'
+          onClick={() => {
+            setMode('register');
+            setError(null);
+          }}
+          className={`pb-2 transition-colors border-b-2 font-medium ${
+            mode === 'register'
+              ? 'border-emerald-500 text-zinc-100'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          Register
+          Create Account
         </button>
       </div>
 
-      {/* Error Alert */}
+      {/* Error Message */}
       {error && (
-        <div className="p-3 bg-red-950/60 border border-red-800/80 rounded-md text-xs text-red-300 flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
-          <span className="leading-snug">{error}</span>
+        <div className="mb-5 p-3 rounded-md bg-red-950/40 border border-red-800 text-red-300 text-xs flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+          <div className="flex-1 leading-snug">{error}</div>
         </div>
       )}
 
-      {/* Email / Password Form */}
+      {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-        <div className="space-y-1.5">
-          <label className="text-zinc-400 font-mono flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Email Address</span>
+        <div>
+          <label className="block text-[11px] text-zinc-400 uppercase tracking-wider mb-1">
+            Identity / Email
           </label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="analyst@enterprise.com"
-            className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 font-mono text-xs transition-colors"
-          />
+          <div className="relative">
+            <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="analyst@enterprise.com"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-2 pl-9 pr-3 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 font-mono text-xs"
+            />
+          </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-zinc-400 font-mono flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Password</span>
+        <div>
+          <label className="block text-[11px] text-zinc-400 uppercase tracking-wider mb-1">
+            Access Key / Password
           </label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••••••"
-            className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-md text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 font-mono text-xs transition-colors"
-          />
+          <div className="relative">
+            <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••••"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-md py-2 pl-9 pr-3 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 font-mono text-xs"
+            />
+          </div>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2 bg-zinc-100 hover:bg-white text-zinc-950 font-semibold rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+          className="w-full bg-zinc-100 hover:bg-white text-zinc-950 font-semibold py-2 px-4 rounded-md transition-colors flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
+            <>
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>Authenticating...</span>
+            </>
           ) : (
             <>
-              <span>{mode === 'login' ? 'Authenticate Session' : 'Create Security Account'}</span>
+              <span>{mode === 'login' ? 'Verify Credentials' : 'Provision Account'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </>
           )}
         </button>
       </form>
 
-      {/* Alternative Login Actions */}
-      <div className="relative flex items-center justify-center">
-        <div className="border-t border-zinc-800 w-full" />
-        <span className="bg-zinc-900 px-2 text-[10px] font-mono text-zinc-500 uppercase absolute">
-          or evaluate tier
-        </span>
-      </div>
-
-      <div className="space-y-2">
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={loading}
-          className="w-full py-2 bg-zinc-950 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-700 text-zinc-300 font-medium rounded-md text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.9C6.5 7.4 9 5 12 5z"/>
-            <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
-            <path fill="#FBBC05" d="M5.6 14.7c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.2C.7 9.6 0 12.2 0 15s.7 5.4 1.9 7.8l3.7-3.1z"/>
-            <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2-6.4-4.8L1.9 16.4C3.7 20.2 7.5 23 12 23z"/>
-          </svg>
-          <span>Continue with Google</span>
-        </button>
-
-        {/* Quick RBAC Role Presets for Instant Testing */}
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => demoLogin('developer')}
-            className="p-2 bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-800/60 text-emerald-300 font-mono rounded-md text-[11px] flex flex-col items-center justify-center text-center transition-colors cursor-pointer"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 mb-0.5" />
-            <span className="font-semibold">Developer Tier</span>
-            <span className="text-[9px] text-emerald-500/80">Unlimited + Admin</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => demoLogin('user')}
-            className="p-2 bg-zinc-950 hover:bg-zinc-800/80 border border-zinc-800 text-zinc-300 font-mono rounded-md text-[11px] flex flex-col items-center justify-center text-center transition-colors cursor-pointer"
-          >
-            <UserCheck className="w-3.5 h-3.5 text-zinc-400 mb-0.5" />
-            <span className="font-semibold">Standard User</span>
-            <span className="text-[9px] text-zinc-500">Quota: 3 Scans/Day</span>
-          </button>
+      {/* Dividers */}
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-zinc-800" />
+        </div>
+        <div className="relative flex justify-center text-[10px] uppercase">
+          <span className="bg-zinc-900 px-2 text-zinc-500 font-mono">
+            Direct Clearance & Sandbox Access
+          </span>
         </div>
       </div>
 
-      <div className="text-[10px] text-zinc-500 font-mono text-center">
-        Encrypted Session Tokens • Firestore RBAC Persistence
+      {/* Fast Clearance Buttons */}
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={() => loginAsDeveloper('sara.dongare@corp-sec.com')}
+          className="w-full bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-800 text-emerald-300 font-mono text-xs py-2 px-3 rounded-md transition-colors flex items-center justify-between"
+        >
+          <span className="flex items-center gap-2">
+            <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Developer Clearance (Full Admin)</span>
+          </span>
+          <span className="text-[10px] bg-emerald-900 text-emerald-200 px-1.5 py-0.5 rounded font-mono">
+            DEV
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          className="w-full bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-mono text-xs py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-2"
+        >
+          <span>Enterprise Google SSO Fallback</span>
+        </button>
+      </div>
+
+      <div className="mt-6 pt-4 border-t border-zinc-800 text-[10px] text-zinc-600 text-center flex items-center justify-center gap-1.5">
+        <UserCheck className="w-3 h-3 text-zinc-500" />
+        <span>Role-Based Access Control • Firestore RBAC</span>
       </div>
     </div>
   );

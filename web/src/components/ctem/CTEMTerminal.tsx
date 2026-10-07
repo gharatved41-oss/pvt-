@@ -13,8 +13,8 @@ export function CTEMTerminal() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [eventLogs]);
 
-  const getLogColor = (level: string) => {
-    switch (level) {
+  const getLogColor = (severity?: string) => {
+    switch ((severity || '').toLowerCase()) {
       case 'crit':
         return 'text-red-400 font-semibold';
       case 'warn':
@@ -67,8 +67,8 @@ export function CTEMTerminal() {
             <span className="text-zinc-500 shrink-0 select-none">
               [{log.timestamp}]
             </span>
-            <span className={`${getLogColor(log.level)} break-all`}>
-              {log.text}
+            <span className={`${getLogColor(log.severity)} break-all`}>
+              {log.message}
             </span>
           </div>
         ))}

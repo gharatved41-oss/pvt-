@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Crown, Plus, Trash2, ShieldAlert, ShieldCheck, Cpu, Sliders, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTwinStore } from '@/store/useTwinStore';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export function AdminControls() {
   const { injectNode, clearLogs, forceAllStatus, nodes } = useTwinStore();
@@ -78,10 +79,19 @@ export function AdminControls() {
             {/* Reset All to Idle */}
             <button
               type="button"
-              onClick={() => forceAllStatus('idle')}
+              onClick={() => forceAllStatus('healthy')}
               className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 rounded transition-colors"
             >
               <span>Reset Statuses</span>
+            </button>
+
+            {/* Reset Quotas */}
+            <button
+              type="button"
+              onClick={() => useAuthStore.getState().resetScans()}
+              className="px-2.5 py-1 bg-blue-950/50 hover:bg-blue-950 border border-blue-800/80 text-blue-300 rounded transition-colors"
+            >
+              <span>Reset Quota (0/3)</span>
             </button>
           </div>
         </div>

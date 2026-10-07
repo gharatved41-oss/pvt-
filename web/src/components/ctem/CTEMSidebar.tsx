@@ -61,12 +61,12 @@ export function CTEMSidebar() {
                   <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 border-t border-zinc-800/60 pt-2">
                     <span className="flex items-center gap-1">
                       <Server className="w-3 h-3" />
-                      {template.initialNodes.length} nodes
+                      {(template.nodes || []).length} nodes
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
                       <Layers className="w-3 h-3" />
-                      {template.edges.length} edges
+                      {(template.edges || []).length} edges
                     </span>
                   </div>
                 </button>
@@ -89,11 +89,15 @@ export function CTEMSidebar() {
             </div>
             <div className="flex justify-between text-zinc-400">
               <span>Ingress Vector:</span>
-              <span className="text-amber-400">{activeTemplate.initialNodes[0]?.name}</span>
+              <span className="text-amber-400">
+                {activeTemplate?.nodes?.[0]?.label || activeTemplate?.nodes?.[0]?.name || 'Ingress'}
+              </span>
             </div>
             <div className="flex justify-between text-zinc-400">
               <span>Primary Crown Jewel:</span>
-              <span className="text-red-400">{activeTemplate.initialNodes[activeTemplate.initialNodes.length - 1]?.name}</span>
+              <span className="text-red-400">
+                {activeTemplate?.nodes?.[activeTemplate.nodes.length - 1]?.label || 'Database'}
+              </span>
             </div>
           </div>
         </div>

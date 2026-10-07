@@ -26,7 +26,7 @@ export function CTEMGraph() {
     return twinNodes.map((node) => ({
       id: node.id,
       type: 'ctemNode',
-      position: node.position,
+      position: node.position || { x: 100, y: 100 },
       data: { ...node },
     }));
   }, [twinNodes]);

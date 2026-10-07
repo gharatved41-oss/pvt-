@@ -2,169 +2,135 @@
 
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { 
-  Server, 
-  Database, 
-  Shield, 
-  Cpu, 
-  AlertOctagon, 
-  CheckCircle2, 
-  Radio, 
-  Lock 
-} from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { NodeType, NodeStatus } from '@/types';
+import { Server, Database, Shield, Cpu, Radio } from 'lucide-react';
+import { TwinNodeData, NodeType, NodeStatus } from '@/lib/mockData';
 
-export interface AssetNodeData {
-  id: string;
-  name?: string;
-  type: NodeType;
-  status: NodeStatus | 'targeted' | 'patched';
-  ipAddress?: string;
-  hostname?: string;
-  openPorts?: number[];
-  softwareStack?: string[];
-  cveExposures?: string[];
-  syntheticRecordsCount?: number;
-  [key: string]: unknown;
-}
+export type AssetNodeData = TwinNodeData;
 
 const ASSET_ICONS: Record<NodeType, React.ElementType> = {
+  ingress: Radio,
+  load_balancer: Cpu,
+  compute: Server,
   server: Server,
   database: Database,
+  iam_role: Shield,
   firewall: Shield,
-  load_balancer: Cpu,
 };
 
 export const AssetNode = memo(({ data, selected }: NodeProps) => {
-  const nodeData = data as unknown as AssetNodeData;
-  const IconComponent = ASSET_ICONS[nodeData.type] || Server;
+  const node = data as unknown as TwinNodeData;
+  const IconComponent = ASSET_ICONS[node.type] || Server;
 
-  // Status Styling according to Non-Vibecoded Manifesto
-  const getStatusStyles = () => {
-    switch (nodeData.status) {
+  const getStatusConfig = (status: NodeStatus) => {
+    switch (status) {
+      case 'probing':
+      case 'scanning':
+        return {
+          border: 'border-amber-500',
+          bg: 'bg-amber-950/20',
+          badgeText: 'PROBING',
+          badgeClass: 'bg-amber-950 text-amber-400 border-amber-700/80',
+          indicator: 'bg-amber-400 animate-pulse',
+        };
       case 'compromised':
         return {
-          containerBorder: 'border-red-500/90 bg-red-950/20 shadow-none',
-          indicator: 'bg-red-500 animate-pulse',
+          border: 'border-red-500',
+          bg: 'bg-red-950/20',
           badgeText: 'COMPROMISED',
-          badgeVariant: 'destructive' as const,
-          badgeColor: 'text-red-400 border-red-800/80 bg-red-950/80',
-        };
-      case 'targeted':
-        return {
-          containerBorder: 'border-amber-500/90 bg-amber-950/20 shadow-none',
-          indicator: 'bg-amber-400 animate-pulse',
-          badgeText: 'TARGETED',
-          badgeVariant: 'amber' as const,
-          badgeColor: 'text-amber-400 border-amber-800/80 bg-amber-950/80',
+          badgeClass: 'bg-red-950 text-red-400 border-red-700/80',
+          indicator: 'bg-red-500 animate-ping',
         };
       case 'patched':
         return {
-          containerBorder: 'border-emerald-500/90 bg-emerald-950/20 shadow-none',
-          indicator: 'bg-emerald-400',
+          border: 'border-emerald-500',
+          bg: 'bg-emerald-950/20',
           badgeText: 'PATCHED',
-          badgeVariant: 'emerald' as const,
-          badgeColor: 'text-emerald-400 border-emerald-800/80 bg-emerald-950/80',
+          badgeClass: 'bg-emerald-950 text-emerald-400 border-emerald-700/80',
+          indicator: 'bg-emerald-400',
         };
       case 'healthy':
+      case 'safe':
+      case 'idle':
       default:
         return {
-          containerBorder: 'border-zinc-800 bg-zinc-950/90 shadow-none',
-          indicator: 'bg-zinc-500',
+          border: 'border-zinc-700',
+          bg: 'bg-zinc-950',
           badgeText: 'HEALTHY',
-          badgeVariant: 'secondary' as const,
-          badgeColor: 'text-zinc-400 border-zinc-700 bg-zinc-900',
+          badgeClass: 'bg-zinc-900 text-zinc-400 border-zinc-700',
+          indicator: 'bg-zinc-500',
         };
     }
   };
 
-  const statusStyle = getStatusStyles();
+  const statusConfig = getStatusConfig(node.status);
 
   return (
     <div
-      className={cn(
-        "w-60 rounded-md border text-zinc-100 transition-all select-none p-3 space-y-2 relative font-sans",
-        statusStyle.containerBorder,
-        selected && "ring-1 ring-zinc-400 border-zinc-400"
-      )}
+      className={`w-64 rounded-md border text-zinc-100 p-3 select-none font-sans relative transition-all duration-200 ${
+        statusConfig.border
+      } ${statusConfig.bg} ${selected ? 'ring-1 ring-zinc-400' : ''}`}
     >
       {/* React Flow Handles */}
       <Handle
         type="target"
         position={Position.Top}
-        className="w-2 h-2 !bg-zinc-600 border !border-zinc-950 rounded-full"
+        className="w-2.5 h-2.5 !bg-zinc-600 border !border-zinc-950 rounded-full"
       />
       <Handle
         type="source"
         position={Position.Bottom}
-        className="w-2 h-2 !bg-zinc-600 border !border-zinc-950 rounded-full"
+        className="w-2.5 h-2.5 !bg-zinc-600 border !border-zinc-950 rounded-full"
       />
 
-      {/* Header: Icon, Node ID & Status Badge */}
-      <div className="flex items-center justify-between gap-1.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-6 h-6 rounded-sm bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
-            <IconComponent className="w-3.5 h-3.5 text-zinc-300" />
+      {/* Header: Icon, Label & Status Badge */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-200">
+            <IconComponent className="w-4 h-4" />
           </div>
-          <span className="font-mono text-xs font-semibold tracking-tight text-zinc-100 truncate" title={nodeData.id}>
-            {nodeData.id}
-          </span>
+          <div>
+            <div className="text-xs font-semibold text-zinc-100 tracking-tight leading-none">
+              {node.label || node.name}
+            </div>
+            <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
+              ID: {node.id}
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className={cn("w-1.5 h-1.5 rounded-full", statusStyle.indicator)} />
-          <Badge 
-            variant={statusStyle.badgeVariant}
-            className={cn("text-[9px] font-mono px-1 py-0 h-4 uppercase tracking-wider font-semibold", statusStyle.badgeColor)}
-          >
-            {statusStyle.badgeText}
-          </Badge>
-        </div>
+        <span
+          className={`px-1.5 py-0.5 text-[9px] font-mono font-bold rounded border uppercase tracking-wider flex items-center gap-1 ${statusConfig.badgeClass}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.indicator}`} />
+          {statusConfig.badgeText}
+        </span>
       </div>
 
-      {/* Network Metadata & Specs */}
-      <div className="border-t border-zinc-800/80 pt-2 space-y-1 text-[11px] font-mono text-zinc-400">
-        <div className="flex items-center justify-between">
-          <span className="text-zinc-500">IP:</span>
-          <span className="text-zinc-300">{nodeData.ipAddress || '10.0.0.0/24'}</span>
+      {/* Node Metadata (IP, Criticality, Vulnerabilities) */}
+      <div className="pt-2 border-t border-zinc-800/80 space-y-1 text-[11px] font-mono">
+        <div className="flex items-center justify-between text-zinc-400">
+          <span className="text-zinc-500">IP ADDRESS:</span>
+          <span className="text-zinc-200">{node.ipAddress || node.ip || '0.0.0.0'}</span>
         </div>
-
-        {nodeData.openPorts && nodeData.openPorts.length > 0 && (
-          <div className="flex items-center justify-between">
-            <span className="text-zinc-500">Ports:</span>
-            <span className="text-zinc-300">[{nodeData.openPorts.join(', ')}]</span>
+        <div className="flex items-center justify-between text-zinc-400">
+          <span className="text-zinc-500">CRITICALITY:</span>
+          <span className="text-amber-400">{node.criticality || 5} / 10</span>
+        </div>
+        {node.services && node.services.length > 0 && (
+          <div className="flex items-center justify-between text-zinc-400">
+            <span className="text-zinc-500">SERVICE:</span>
+            <span className="truncate max-w-[120px] text-zinc-300">
+              {node.services[0].serviceName} :{node.services[0].port}
+            </span>
           </div>
         )}
-
-        {nodeData.syntheticRecordsCount !== undefined && nodeData.syntheticRecordsCount > 0 && (
-          <div className="flex items-center justify-between text-zinc-300">
-            <span className="text-zinc-500">Records:</span>
-            <span className="text-emerald-400 font-semibold">{nodeData.syntheticRecordsCount.toLocaleString()} fake</span>
+        {node.cve && (
+          <div className="flex items-center justify-between text-zinc-400">
+            <span className="text-zinc-500">EXPOSURE:</span>
+            <span className="text-red-400 truncate max-w-[120px]">{node.cve}</span>
           </div>
         )}
       </div>
-
-      {/* CVE / Vulnerability Alert Pill if Compromised */}
-      {nodeData.status === 'compromised' && nodeData.cveExposures && nodeData.cveExposures.length > 0 && (
-        <div className="pt-1">
-          <div className="text-[10px] font-mono text-red-400 bg-red-950/60 border border-red-900/40 rounded px-1.5 py-0.5 flex items-center gap-1 truncate">
-            <AlertOctagon className="w-3 h-3 shrink-0" />
-            <span className="truncate">{nodeData.cveExposures.join(', ')}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Patched Protection Confirmation Pill */}
-      {nodeData.status === 'patched' && (
-        <div className="pt-1">
-          <div className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-900/40 rounded px-1.5 py-0.5 flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 shrink-0" />
-            <span>AEV Verified Secure</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 });

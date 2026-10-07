@@ -5,51 +5,147 @@ import { AuthGuard } from '@/components/layout/AuthGuard';
 import { TopNav } from '@/components/layout/TopNav';
 import { AdminControls } from '@/components/dashboard/AdminControls';
 import { TwinSelector } from '@/components/dashboard/TwinSelector';
-import { GraphCanvas } from '@/components/dashboard/GraphCanvas';
-import { AuditTerminal } from '@/components/dashboard/AuditTerminal';
-import { CTEMPatchPanel } from '@/components/ctem/CTEMPatchPanel';
+import { GraphCanvas } from '@/components/twin/GraphCanvas';
+import { TerminalFeed } from '@/components/twin/TerminalFeed';
+import { RemediationPanel } from '@/components/twin/RemediationPanel';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTwinStore } from '@/store/useTwinStore';
+import { Play, RefreshCw, ShieldAlert, Layers } from 'lucide-react';
 
 function DashboardView() {
-  const { role } = useAuthStore();
-  const { simulationState, activePatch } = useTwinStore();
+  const { role, scansUsed, maxScans } = useAuthStore();
+  const {
+    simulationStatus,
+    simulationProgress,
+    runValidation,
+    selectedTemplate,
+    loadTemplate,
+    riskScore,
+  } = useTwinStore();
+
   const isDeveloper = role === 'developer';
+  const isRunning = simulationStatus === 'RUNNING';
+  const isQuotaReached = !isDeveloper && scansUsed >= maxScans;
 
   return (
-    <div className="flex h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans select-none">
-      {/* 1. Left Sidebar: Architecture Selector */}
-      <TwinSelector />
+    <div className="flex flex-col h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans select-none">
+      {/* 1. Header Navigation Bar */}
+      <TopNav />
 
-      {/* 2. Main Content Viewport */}
-      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
-        {/* Top Navigation Bar: User Email, Role Badge, Sign Out & Run Validation */}
-        <TopNav />
+      {/* 2. Developer Admin Override Panel */}
+      {isDeveloper && (
+        <div className="px-4 py-2 border-b border-zinc-800 bg-zinc-950 shrink-0">
+          <AdminControls />
+        </div>
+      )}
 
-        {/* Dynamic Canvas & Telemetry Area */}
-        <div className="flex-1 relative min-h-0 bg-zinc-950 flex flex-col overflow-hidden">
-          {/* Conditional Developer View: Admin Controls Panel */}
-          {isDeveloper && (
-            <div className="p-3 border-b border-zinc-800/80 bg-zinc-950/90 z-20 shrink-0">
-              <AdminControls />
+      {/* 3. Main Split Viewport */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+        
+        {/* LEFT COLUMN (70%): Template selector, Control bar & Interactive Graph Canvas */}
+        <div className="lg:w-[70%] w-full flex flex-col h-full border-r border-zinc-800 min-h-0">
+          
+          {/* Top Control Bar */}
+          <div className="h-12 border-b border-zinc-800 bg-zinc-900/40 px-4 flex items-center justify-between shrink-0 font-mono text-xs">
+            {/* Architecture Template Selector Tabs */}
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 uppercase text-[10px] tracking-wider flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5 text-zinc-400" />
+                Template:
+              </span>
+              <button
+                type="button"
+                onClick={() => loadTemplate('ecommerce')}
+                className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                  selectedTemplate === 'ecommerce'
+                    ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                E-Commerce Cloud
+              </button>
+              <button
+                type="button"
+                onClick={() => loadTemplate('healthcare')}
+                className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                  selectedTemplate === 'healthcare'
+                    ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Healthcare PACS
+              </button>
             </div>
-          )}
 
-          {/* Remediation Patch Reveal when Simulation Completes */}
-          {simulationState === 'COMPLETED' && activePatch && (
-            <div className="p-4 bg-zinc-950/95 border-b border-zinc-800 shrink-0 z-10 max-h-72 overflow-y-auto">
-              <CTEMPatchPanel />
+            {/* Quick Run Action & Risk Badge */}
+            <div className="flex items-center gap-3">
+              {riskScore > 0 && (
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span className="text-zinc-500">Compound Risk:</span>
+                  <span
+                    className={`font-bold px-1.5 py-0.5 rounded border ${
+                      riskScore >= 80
+                        ? 'bg-red-950 text-red-400 border-red-800'
+                        : riskScore >= 50
+                        ? 'bg-amber-950 text-amber-400 border-amber-800'
+                        : 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                    }`}
+                  >
+                    {riskScore} / 100
+                  </span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                disabled={isRunning || isQuotaReached}
+                onClick={() => runValidation()}
+                className={`px-3 py-1 rounded font-semibold text-xs flex items-center gap-1.5 transition-all ${
+                  isQuotaReached
+                    ? 'bg-zinc-900 text-red-400 border border-red-900 cursor-not-allowed'
+                    : isRunning
+                    ? 'bg-zinc-800 text-zinc-400 border border-zinc-700 cursor-not-allowed'
+                    : 'bg-zinc-100 hover:bg-white text-zinc-950 cursor-pointer active:scale-98'
+                }`}
+              >
+                {isRunning ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                    <span>Validating ({simulationProgress}%)...</span>
+                  </>
+                ) : isQuotaReached ? (
+                  <>
+                    <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
+                    <span>Quota Exhausted (3/3)</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Run AI Validation</span>
+                  </>
+                )}
+              </button>
             </div>
-          )}
+          </div>
 
-          {/* Network Topology Graph Canvas */}
-          <div className="flex-1 min-h-0 relative">
+          {/* Interactive Digital Twin Graph Canvas */}
+          <div className="flex-1 relative min-h-0 bg-zinc-950">
             <GraphCanvas />
           </div>
         </div>
 
-        {/* Bottom Audit Terminal Feed */}
-        <AuditTerminal />
+        {/* RIGHT COLUMN (30%): Telemetry Stream stacked above Remediation Panel */}
+        <div className="lg:w-[30%] w-full flex flex-col h-full bg-zinc-950 min-h-0 overflow-y-auto">
+          {/* Real-time Telemetry Terminal Stream */}
+          <div className="p-3 border-b border-zinc-800 shrink-0">
+            <TerminalFeed className="h-80" />
+          </div>
+
+          {/* Remediation & Verification Panel */}
+          <div className="p-3 flex-1 overflow-y-auto">
+            <RemediationPanel />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, ReactNode } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { AuthForm } from '@/components/auth/AuthForm';
+import { AuthCard } from '@/components/auth/AuthCard';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -40,7 +40,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   if (!user) {
     return (
       <div className="min-h-screen w-full bg-zinc-950 flex items-center justify-center p-4">
-        <AuthForm />
+        <AuthCard />
       </div>
     );
   }

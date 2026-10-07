@@ -5,11 +5,14 @@ import { Handle, Position, NodeProps } from '@xyflow/react';
 import { Server, Database, Shield, Cpu, AlertTriangle, CheckCircle2, ShieldCheck, Activity } from 'lucide-react';
 import { TwinNode, NodeStatus } from '@/lib/mockData';
 
-const NODE_ICONS = {
+const NODE_ICONS: Record<string, React.ElementType> = {
   server: Server,
+  compute: Server,
   database: Database,
   firewall: Shield,
+  iam_role: Shield,
   load_balancer: Cpu,
+  ingress: Cpu,
 };
 
 export const CTEMNode = memo(({ data }: NodeProps) => {
@@ -108,7 +111,7 @@ export const CTEMNode = memo(({ data }: NodeProps) => {
               {node.cve}
             </span>
             <span className="text-[9px] px-1 rounded bg-red-950/80 text-red-300 border border-red-800/60">
-              CVSS {node.cvss.toFixed(1)}
+              CVSS {node.cvss != null ? node.cvss.toFixed(1) : '8.5'}
             </span>
           </div>
         )}

@@ -1,275 +1,377 @@
-export type NodeStatus = 'idle' | 'scanning' | 'safe' | 'compromised' | 'patched';
+export type NodeType = 'ingress' | 'load_balancer' | 'compute' | 'database' | 'iam_role' | 'server' | 'firewall';
+export type NodeStatus = 'healthy' | 'probing' | 'compromised' | 'patched' | 'targeted' | 'idle' | 'scanning' | 'safe';
 
-export interface TwinNode {
-  id: string;
-  name: string;
-  type: 'server' | 'database' | 'firewall' | 'load_balancer';
-  status: NodeStatus;
-  ip: string;
+export interface NodeService {
   port: number;
-  cve: string;
-  cvss: number;
-  description: string;
-  position: { x: number; y: number };
+  protocol: 'TCP' | 'UDP';
+  serviceName: string;
+  version: string;
+  cve?: string;
+  vulnerable: boolean;
 }
 
-export interface TwinEdge {
+export interface TwinNodeData {
+  id: string;
+  label?: string;
+  name?: string;
+  type: NodeType;
+  ipAddress?: string;
+  ip?: string;
+  port?: number;
+  subnet?: string;
+  os?: string;
+  services?: NodeService[];
+  criticality?: number; // 1 (Edge) to 10 (Core Database)
+  status: NodeStatus;
+  syntheticRecordsCount?: number;
+  cve?: string;
+  cvss?: number;
+  description?: string;
+  position?: { x: number; y: number };
+  [key: string]: unknown;
+}
+
+export interface TwinEdgeData {
   id: string;
   source: string;
   target: string;
+  allowedPorts: number[];
+  protocol: 'TCP' | 'UDP' | 'ANY';
+  accessState: 'open' | 'restricted' | 'blocked';
+  isTraversed: boolean;
   label?: string;
-  protocol?: string;
-  accessState?: 'open' | 'restricted' | 'blocked';
+}
+
+export interface TelemetryEvent {
+  id: string;
+  timestamp: string; // HH:mm:ss.SSS
+  step: 'INGRESS_DISCOVERY' | 'PORT_EVALUATION' | 'EXPLOIT_VERIFIED' | 'LATERAL_PIVOT' | 'BLAST_RADIUS_ESTABLISHED';
+  severity: 'INFO' | 'WARN' | 'CRIT' | 'SUCCESS';
+  targetNodeId: string;
+  targetIp: string;
+  message: string;
 }
 
 export interface RemediationPatch {
   title: string;
   cve: string;
+  targetEdgeId: string;
   targetNodeId: string;
   humanExplanation: string;
   machineAction: string;
   diffSnippet: string;
 }
 
-export interface SimulationStep {
-  delayMs: number;
-  targetNodeId: string;
-  targetStatus: NodeStatus;
-  log: string;
-  logLevel: 'info' | 'warn' | 'crit' | 'success';
-}
-
-export interface TemplateArchitecture {
+export interface ArchitectureTemplate {
   id: string;
   name: string;
   category: string;
   description: string;
-  initialNodes: TwinNode[];
-  edges: TwinEdge[];
-  steps: SimulationStep[];
+  nodes: TwinNodeData[];
+  edges: TwinEdgeData[];
   patch: RemediationPatch;
 }
 
-export const TEMPLATES: Record<string, TemplateArchitecture> = {
-  ecommerce: {
-    id: 'ecommerce',
-    name: 'E-Commerce Cloud',
-    category: 'Retail & Multi-Tier Web Architecture',
-    description: 'Public-facing load balanced web store with isolated internal microservices and relational customer database.',
-    initialNodes: [
-      {
-        id: 'Load-Balancer',
-        name: 'Load-Balancer',
-        type: 'load_balancer',
-        status: 'idle',
-        ip: '198.51.100.12',
-        port: 443,
-        cve: 'N/A',
-        cvss: 0.0,
-        description: 'AWS ALB with Cloud Armor WAF and SSL Termination',
-        position: { x: 50, y: 140 },
-      },
-      {
-        id: 'Web-Frontend',
-        name: 'Web-Frontend',
-        type: 'server',
-        status: 'idle',
-        ip: '10.0.1.24',
-        port: 3000,
-        cve: 'CVE-2024-21338',
-        cvss: 9.8,
-        description: 'Next.js / Node.js 18 SSR application container',
-        position: { x: 280, y: 80 },
-      },
-      {
-        id: 'Auth-Service',
-        name: 'Auth-Service',
-        type: 'server',
-        status: 'idle',
-        ip: '10.0.2.15',
-        port: 8080,
-        cve: 'CVE-2023-44487',
-        cvss: 7.5,
-        description: 'OAuth2 / JWT Token Authority service',
-        position: { x: 280, y: 220 },
-      },
-      {
-        id: 'Postgres-DB',
-        name: 'Postgres-DB',
-        type: 'database',
-        status: 'idle',
-        ip: '10.0.3.50',
-        port: 5432,
-        cve: 'CWE-89 (SQLi Traversal)',
-        cvss: 9.1,
-        description: 'Primary customer orders and credentials database',
-        position: { x: 540, y: 150 },
-      },
-    ],
-    edges: [
-      { id: 'e1', source: 'Load-Balancer', target: 'Web-Frontend', label: 'HTTP/2 :3000', protocol: 'TCP' },
-      { id: 'e2', source: 'Load-Balancer', target: 'Auth-Service', label: 'gRPC :8080', protocol: 'TCP' },
-      { id: 'e3', source: 'Web-Frontend', target: 'Postgres-DB', label: 'SQL :5432 (Unsegmented)', protocol: 'TCP' },
-      { id: 'e4', source: 'Auth-Service', target: 'Postgres-DB', label: 'SQL :5432', protocol: 'TCP' },
-    ],
-    steps: [
-      {
-        delayMs: 1000,
-        targetNodeId: 'Web-Frontend',
-        targetStatus: 'scanning',
-        log: '[INFO] Traversing edge to Web-Frontend via ALB perimeter ingress (:443 -> :3000)...',
-        logLevel: 'info',
-      },
-      {
-        delayMs: 3000,
-        targetNodeId: 'Web-Frontend',
-        targetStatus: 'compromised',
-        log: '[CRIT] CVE-2024-21338 exploited on Web-Frontend. Remote Code Execution verified. Blast radius: High.',
-        logLevel: 'crit',
-      },
-      {
-        delayMs: 4500,
-        targetNodeId: 'Postgres-DB',
-        targetStatus: 'scanning',
-        log: '[WARN] Lateral pivot validated: Ingress subnet route to Postgres-DB (10.0.3.50:5432) lacks Network Security Group isolation.',
-        logLevel: 'warn',
-      },
-      {
-        delayMs: 5500,
-        targetNodeId: 'Postgres-DB',
-        targetStatus: 'compromised',
-        log: '[CRIT] Unauthenticated database query succeeded on Postgres-DB. 15,000 synthetic customer records reachable.',
-        logLevel: 'crit',
-      },
-      {
-        delayMs: 6500,
-        targetNodeId: 'Load-Balancer',
-        targetStatus: 'safe',
-        log: '[SUCCESS] Exposure validation complete. Target blast radius confirmed. Synthesizing immutable remediation patch...',
-        logLevel: 'success',
-      },
-    ],
-    patch: {
-      title: 'Enforce VPC Subnet Network ACL & Restrict DB Ingress',
-      cve: 'CVE-2024-21338 / Lateral Pivoting',
-      targetNodeId: 'Web-Frontend',
-      humanExplanation: 'Restricts direct database connections from the public web frontend subnet. Forces authentication through an isolated internal API proxy and updates Node.js runtime container dependencies.',
-      machineAction: 'APPLY_FIREWALL_RULE_AND_CONTAINER_PATCH',
-      diffSnippet: `--- a/infra/security_groups.tf
-+++ b/infra/security_groups.tf
-@@ -14,6 +14,8 @@ resource "aws_security_group_rule" "db_ingress" {
--  cidr_blocks = ["10.0.0.0/16"]  # Overly permissive ingress
-+  cidr_blocks = ["10.0.2.0/24"]  # Auth-Service subnet only
+// 1. E-COMMERCE CLOUD VPC TEMPLATE
+export const ecommerceTemplate: ArchitectureTemplate = {
+  id: 'ecommerce',
+  name: 'Enterprise Cloud VPC (E-Commerce Stack)',
+  category: 'Retail & Multi-Tier Cloud VPC',
+  description: 'Public AWS ALB ingress routing to Node.js compute, which possesses unrestricted lateral access to the primary customer PostgreSQL database.',
+  nodes: [
+    {
+      id: 'node-ingress-alb',
+      label: 'AWS ALB Ingress',
+      name: 'AWS ALB Ingress',
+      type: 'load_balancer',
+      ipAddress: '198.51.100.12',
+      ip: '198.51.100.12',
+      port: 443,
+      subnet: '0.0.0.0/0 (Internet Ingress)',
+      os: 'AWS Managed ALB',
+      services: [
+        {
+          port: 443,
+          protocol: 'TCP',
+          serviceName: 'HTTPS Reverse Proxy',
+          version: 'AWS ALB v2',
+          vulnerable: false,
+        },
+      ],
+      criticality: 4,
+      status: 'healthy',
+      position: { x: 40, y: 140 },
+      description: 'Public Internet Gateway with TLS termination and AWS WAF rule enforcement.',
+    },
+    {
+      id: 'node-web-api',
+      label: 'Node.js API Gateway',
+      name: 'Node.js API Gateway',
+      type: 'compute',
+      ipAddress: '10.0.1.15',
+      ip: '10.0.1.15',
+      port: 3000,
+      subnet: '10.0.1.0/24 (Public DMZ)',
+      os: 'Debian Linux 12 (Kernel 6.1)',
+      services: [
+        {
+          port: 3000,
+          protocol: 'TCP',
+          serviceName: 'Reverse Proxy API',
+          version: 'Express 4.18.2',
+          cve: 'CVE-2024-21338',
+          vulnerable: true,
+        },
+      ],
+      criticality: 7,
+      status: 'healthy',
+      cve: 'CVE-2024-21338',
+      cvss: 9.8,
+      position: { x: 290, y: 80 },
+      description: 'API gateway serving public endpoints with misconfigured reverse-proxy path evaluation.',
+    },
+    {
+      id: 'node-auth-svc',
+      label: 'Auth Microservice',
+      name: 'Auth Microservice',
+      type: 'compute',
+      ipAddress: '10.0.2.40',
+      ip: '10.0.2.40',
+      port: 8080,
+      subnet: '10.0.2.0/24 (Internal Core)',
+      os: 'Alpine Linux 3.19',
+      services: [
+        {
+          port: 8080,
+          protocol: 'TCP',
+          serviceName: 'OAuth2 Token Authority',
+          version: 'Go-OAuth v1.4',
+          cve: 'CVE-2023-44487',
+          vulnerable: false,
+        },
+      ],
+      criticality: 6,
+      status: 'healthy',
+      position: { x: 290, y: 220 },
+      description: 'Internal authentication server providing ephemeral JWT and machine-to-machine tokens.',
+    },
+    {
+      id: 'node-postgres-db',
+      label: 'PostgreSQL Main DB',
+      name: 'PostgreSQL Main DB',
+      type: 'database',
+      ipAddress: '10.0.3.100',
+      ip: '10.0.3.100',
+      port: 5432,
+      subnet: '10.0.3.0/24 (Restricted DB Tier)',
+      os: 'Ubuntu 22.04 LTS (RDS)',
+      services: [
+        {
+          port: 5432,
+          protocol: 'TCP',
+          serviceName: 'PostgreSQL Relational Engine',
+          version: '15.4',
+          cve: 'CVE-2023-39417',
+          vulnerable: true,
+        },
+      ],
+      criticality: 10,
+      status: 'healthy',
+      syntheticRecordsCount: 50000,
+      cve: 'CVE-2023-39417',
+      cvss: 8.8,
+      position: { x: 550, y: 150 },
+      description: 'Core customer transactional database containing 50,000 synthetic PII and payment records.',
+    },
+  ],
+  edges: [
+    {
+      id: 'edge-alb-web',
+      source: 'node-ingress-alb',
+      target: 'node-web-api',
+      allowedPorts: [443, 3000],
+      protocol: 'TCP',
+      accessState: 'open',
+      isTraversed: false,
+      label: 'TCP :443 -> :3000',
+    },
+    {
+      id: 'edge-web-db',
+      source: 'node-web-api',
+      target: 'node-postgres-db',
+      allowedPorts: [5432],
+      protocol: 'TCP',
+      accessState: 'open',
+      isTraversed: false,
+      label: 'TCP :5432 (Unsegmented)',
+    },
+    {
+      id: 'edge-alb-auth',
+      source: 'node-ingress-alb',
+      target: 'node-auth-svc',
+      allowedPorts: [443, 8080],
+      protocol: 'TCP',
+      accessState: 'restricted',
+      isTraversed: false,
+      label: 'TCP :8080 (Restricted)',
+    },
+  ],
+  patch: {
+    title: 'Postgres Subnet Firewall Hardening',
+    cve: 'CWE-284 (Permissive Internal Exposure)',
+    targetEdgeId: 'edge-web-db',
+    targetNodeId: 'node-postgres-db',
+    humanExplanation:
+      'The web server subnet (10.0.1.0/24) maintains direct unsegmented access to the database port (5432). Applying a security group rule restricts Port 5432 exclusively to backend authenticated worker pools, neutralizing lateral pivot.',
+    machineAction: 'aws ec2 authorize-security-group-egress --group-id sg-web --protocol tcp --port 5432 --cidr 10.0.3.100/32',
+    diffSnippet: `--- a/terraform/security_groups.tf
++++ b/terraform/security_groups.tf
+@@ -14,7 +14,8 @@ resource "aws_security_group_rule" "db_ingress" {
+   type              = "ingress"
+   from_port         = 5432
+   to_port           = 5432
+   protocol          = "tcp"
+-  cidr_blocks       = ["10.0.0.0/16"] # Flaw: Permissive VPC wide access
++  cidr_blocks       = ["10.0.2.0/24"] # Patched: Internal App Tier Only
 +  security_group_id = aws_security_group.db.id
-+  from_port         = 5432
-+  to_port           = 5432
-+  protocol          = "tcp"
  }`,
-    },
-  },
-
-  healthcare: {
-    id: 'healthcare',
-    name: 'Healthcare PACS',
-    category: 'HIPAA Regulated Clinical Imaging Network',
-    description: 'Enterprise Picture Archiving and Communication System containing sensitive DICOM imaging and patient PHI.',
-    initialNodes: [
-      {
-        id: 'VPN-Gateway',
-        name: 'VPN-Gateway',
-        type: 'firewall',
-        status: 'idle',
-        ip: '203.0.113.88',
-        port: 1194,
-        cve: 'CVE-2023-46805',
-        cvss: 8.2,
-        description: 'Perimeter SSL-VPN Gateway for remote radiologist workstations',
-        position: { x: 50, y: 150 },
-      },
-      {
-        id: 'Internal-API',
-        name: 'Internal-API',
-        type: 'server',
-        status: 'idle',
-        ip: '172.16.4.10',
-        port: 8443,
-        cve: 'CVE-2024-27198',
-        cvss: 9.8,
-        description: 'Internal DICOM Router & Patient Routing Service',
-        position: { x: 300, y: 150 },
-      },
-      {
-        id: 'Patient-Records-DB',
-        name: 'Patient-Records-DB',
-        type: 'database',
-        status: 'idle',
-        ip: '172.16.5.99',
-        port: 27017,
-        cve: 'CWE-284 (Improper Access Control)',
-        cvss: 9.4,
-        description: 'Encrypted MongoDB cluster storing 85,000 synthetic patient records',
-        position: { x: 560, y: 150 },
-      },
-    ],
-    edges: [
-      { id: 'h1', source: 'VPN-Gateway', target: 'Internal-API', label: 'TLS :8443 (Direct Tunnel)', protocol: 'TCP' },
-      { id: 'h2', source: 'Internal-API', target: 'Patient-Records-DB', label: 'Mongo Wire :27017', protocol: 'TCP' },
-      { id: 'h3', source: 'VPN-Gateway', target: 'Patient-Records-DB', label: 'Lateral Route (Unchecked)', protocol: 'TCP' },
-    ],
-    steps: [
-      {
-        delayMs: 1000,
-        targetNodeId: 'VPN-Gateway',
-        targetStatus: 'scanning',
-        log: '[INFO] Traversing edge to VPN-Gateway perimeter (203.0.113.88:1194)...',
-        logLevel: 'info',
-      },
-      {
-        delayMs: 3000,
-        targetNodeId: 'VPN-Gateway',
-        targetStatus: 'compromised',
-        log: '[CRIT] CVE-2023-46805 authentication bypass verified on VPN-Gateway. Internal routing session established.',
-        logLevel: 'crit',
-      },
-      {
-        delayMs: 4500,
-        targetNodeId: 'Internal-API',
-        targetStatus: 'compromised',
-        log: '[CRIT] Lateral hop executed: Internal-API breached via administrative token replay. DICOM proxy hijacked.',
-        logLevel: 'crit',
-      },
-      {
-        delayMs: 5500,
-        targetNodeId: 'Patient-Records-DB',
-        targetStatus: 'compromised',
-        log: '[CRIT] PHI Exfiltration Path Confirmed: Direct access to Patient-Records-DB (172.16.5.99:27017). Blast Radius: CRITICAL (HIPAA Impact).',
-        logLevel: 'crit',
-      },
-      {
-        delayMs: 6500,
-        targetNodeId: 'VPN-Gateway',
-        targetStatus: 'compromised',
-        log: '[SUCCESS] Exposure validation complete. Automated remediation policy generated.',
-        logLevel: 'success',
-      },
-    ],
-    patch: {
-      title: 'Patch Perimeter SSL-VPN & Enforce Zero-Trust Microsegmentation',
-      cve: 'CVE-2023-46805 / DICOM Pipeline',
-      targetNodeId: 'VPN-Gateway',
-      humanExplanation: 'Updates the SSL-VPN gateway firmware to mitigate authentication bypass and isolates the clinical imaging database inside an egress-locked subnet accessible strictly via mutual TLS.',
-      machineAction: 'APPLY_FIRMWARE_UPGRADE_AND_MTLS',
-      diffSnippet: `--- a/network/firewall_rules.json
-+++ b/network/firewall_rules.json
-@@ -8,7 +8,11 @@
--  "allow_vpn_to_db": true,
-+  "allow_vpn_to_db": false,
-+  "require_mtls_client_cert": true,
-+  "isolate_phi_subnet": {
-+    "subnet": "172.16.5.0/24",
-+    "permitted_sources": ["172.16.4.10/32"]
-+  }
- }`,
-    },
   },
 };
+
+// 2. HEALTHCARE PACS NETWORK TEMPLATE
+export const healthcareTemplate: ArchitectureTemplate = {
+  id: 'healthcare',
+  name: 'Healthcare PACS Network (HIPAA Regulated)',
+  category: 'Healthcare & Medical Devices',
+  description: 'External VPN Gateway connecting to DICOM Medical Imaging Server, with direct unencrypted communication into the Patient Health Information (PHI) archive.',
+  nodes: [
+    {
+      id: 'node-vpn-gateway',
+      label: 'External VPN Gateway',
+      name: 'External VPN Gateway',
+      type: 'ingress',
+      ipAddress: '192.0.2.55',
+      ip: '192.0.2.55',
+      port: 1194,
+      subnet: '0.0.0.0/0 (Perimeter Gateway)',
+      os: 'OpenVPN Access Server 2.11',
+      services: [
+        {
+          port: 1194,
+          protocol: 'UDP',
+          serviceName: 'OpenVPN Daemon',
+          version: '2.11.0',
+          vulnerable: false,
+        },
+      ],
+      criticality: 5,
+      status: 'healthy',
+      position: { x: 40, y: 140 },
+      description: 'Perimeter tunnel gateway for clinical staff tele-radiology remote access.',
+    },
+    {
+      id: 'node-dicom-viewer',
+      label: 'DICOM Imaging Server',
+      name: 'DICOM Imaging Server',
+      type: 'compute',
+      ipAddress: '172.16.4.12',
+      ip: '172.16.4.12',
+      port: 8042,
+      subnet: '172.16.4.0/24 (Radiology VLAN)',
+      os: 'Red Hat Enterprise Linux 8.8',
+      services: [
+        {
+          port: 8042,
+          protocol: 'TCP',
+          serviceName: 'Orthanc DICOM Web API',
+          version: '1.9.7',
+          cve: 'CVE-2023-33476',
+          vulnerable: true,
+        },
+      ],
+      criticality: 8,
+      status: 'healthy',
+      cve: 'CVE-2023-33476',
+      cvss: 9.1,
+      position: { x: 290, y: 140 },
+      description: 'Web-accessible picture archiving and communication system (PACS) viewer with unauthenticated REST endpoint.',
+    },
+    {
+      id: 'node-phi-db',
+      label: 'Patient PHI Archive',
+      name: 'Patient PHI Archive',
+      type: 'database',
+      ipAddress: '172.16.10.88',
+      ip: '172.16.10.88',
+      port: 27017,
+      subnet: '172.16.10.0/24 (HIPAA Vault)',
+      os: 'RHEL 9 Hardened Storage Node',
+      services: [
+        {
+          port: 27017,
+          protocol: 'TCP',
+          serviceName: 'MongoDB PHI Store',
+          version: '6.0.4',
+          cve: 'CVE-2023-1408',
+          vulnerable: true,
+        },
+      ],
+      criticality: 10,
+      status: 'healthy',
+      syntheticRecordsCount: 120000,
+      cve: 'CVE-2023-1408',
+      cvss: 9.4,
+      position: { x: 550, y: 140 },
+      description: 'Protected Health Information database containing 120,000 synthetic patient health records.',
+    },
+  ],
+  edges: [
+    {
+      id: 'edge-vpn-dicom',
+      source: 'node-vpn-gateway',
+      target: 'node-dicom-viewer',
+      allowedPorts: [1194, 8042],
+      protocol: 'TCP',
+      accessState: 'open',
+      isTraversed: false,
+      label: 'TCP :8042 (Permissive)',
+    },
+    {
+      id: 'edge-dicom-phi',
+      source: 'node-dicom-viewer',
+      target: 'node-phi-db',
+      allowedPorts: [27017],
+      protocol: 'TCP',
+      accessState: 'open',
+      isTraversed: false,
+      label: 'TCP :27017 (Unencrypted)',
+    },
+  ],
+  patch: {
+    title: 'HIPAA Microsegmentation & Port Lockdown',
+    cve: 'HIPAA Security Rule § 164.312(a)(1)',
+    targetEdgeId: 'edge-dicom-phi',
+    targetNodeId: 'node-phi-db',
+    humanExplanation:
+      'The DICOM viewer possesses unrestricted routing to the database port 27017 across VLAN boundaries. Applying an explicit host-based iptables filter blocks the port from unverified viewer processes and terminates the lateral pivot.',
+    machineAction: 'iptables -A INPUT -p tcp -s 172.16.4.12 --dport 27017 -j DROP; systemctl restart netfilter-persistent',
+    diffSnippet: `--- a/firewall/rules.v4
++++ b/firewall/rules.v4
+@@ -10,6 +10,7 @@
+ # HIPAA Vault Isolation Rules
+ -A INPUT -p tcp -s 172.16.4.0/24 --dport 27017 -j ACCEPT
++-A INPUT -p tcp --dport 27017 -m conntrack --ctstate NEW -j DROP
++# Dropped unauthenticated DICOM pivoting vector
+ COMMIT`,
+  },
+};
+
+export const TEMPLATES: Record<string, ArchitectureTemplate> = {
+  ecommerce: ecommerceTemplate,
+  healthcare: healthcareTemplate,
+};
+
+// Aliases for backwards compatibility with any legacy imports
+export type TwinNode = TwinNodeData;
+export type TwinEdge = TwinEdgeData;
+export type TemplateArchitecture = ArchitectureTemplate;

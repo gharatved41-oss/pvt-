@@ -56,11 +56,11 @@ export function TwinSelector() {
               <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 border-t border-zinc-800/60 pt-2">
                 <span className="flex items-center gap-1">
                   <Server className="w-3 h-3" />
-                  {template.initialNodes.length} Assets
+                  {(template.nodes || []).length} Assets
                 </span>
                 <span className="flex items-center gap-1 text-zinc-400">
                   <Layers className="w-3 h-3" />
-                  {template.edges.length} Interconnects
+                  {(template.edges || []).length} Interconnects
                 </span>
               </div>
             </button>
@@ -75,11 +75,15 @@ export function TwinSelector() {
           <div className="space-y-1.5">
             <div className="flex justify-between text-zinc-400">
               <span>Perimeter:</span>
-              <span className="text-amber-400">{activeTemplate.initialNodes[0]?.name}</span>
+              <span className="text-amber-400">
+                {activeTemplate?.nodes?.[0]?.label || activeTemplate?.nodes?.[0]?.name || 'Ingress'}
+              </span>
             </div>
             <div className="flex justify-between text-zinc-400">
               <span>Critical Target:</span>
-              <span className="text-red-400">{activeTemplate.initialNodes[activeTemplate.initialNodes.length - 1]?.name}</span>
+              <span className="text-red-400">
+                {activeTemplate?.nodes?.[activeTemplate.nodes.length - 1]?.label || 'Database'}
+              </span>
             </div>
             <div className="flex justify-between text-zinc-400">
               <span>Threat Spec:</span>
