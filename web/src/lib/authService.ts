@@ -120,3 +120,41 @@ export async function registerWithEmail(email: string, password: string): Promis
 export async function logout(): Promise<void> {
   await firebaseSignOut(auth);
 }
+
+export async function authenticateDeveloper(username: string, passcode: string): Promise<UserCredential> {
+  const validPasscodes = (process.env.NEXT_PUBLIC_DEV_PASSCODES || '').split(',').map(p => p.trim());
+  if (!validPasscodes.includes(passcode)) {
+    throw new Error('[ERROR] INVALID_CLEARANCE_CODE');
+  }
+
+  const email = `${username.trim().toLowerCase()}@vulntwin.internal`;
+  let credential: UserCredential;
+
+  try {
+    credential = await signInWithEmailAndPassword(auth, email, passcode);
+  } catch (err: any) {
+    if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+      try {
+        credential = await createUserWithEmailAndPassword(auth, email, passcode);
+      } catch (createErr) {
+        throw createErr;
+      }
+    } else {
+      throw err;
+    }
+  }
+
+  if (db) {
+    const userDocRef = doc(db, 'users', credential.user.uid);
+    await setDoc(userDocRef, {
+      uid: credential.user.uid,
+      email: credential.user.email,
+      role: 'developer',
+      quota: 'unlimited',
+      createdAt: serverTimestamp(),
+      username: username.trim(),
+    }, { merge: true });
+  }
+
+  return credential;
+}

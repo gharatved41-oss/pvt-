@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { ReactFlow, Background, Controls, NodeProps, Edge, Node, Handle, Position } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useTwinStore } from '@/store/useTwinStore';
@@ -11,19 +11,24 @@ interface CustomNodeData extends Record<string, unknown> {
   ipAddress?: string;
   status?: 'healthy' | 'probing' | 'compromised' | 'patched';
   services?: Array<{ port: number; serviceName: string }>;
+  isSelected?: boolean;
 }
 
 // Custom Node Component
 const CustomNode = ({ data }: NodeProps) => {
-  const { label, type, ipAddress, status, services = [] } = data as CustomNodeData;
+  const { label, type, ipAddress, status, services = [], isSelected } = data as CustomNodeData;
 
   let statusStyles = 'border-zinc-800 bg-zinc-900/60';
   if (status === 'probing') statusStyles = 'border-amber-500/80 bg-amber-950/20';
   else if (status === 'compromised') statusStyles = 'border-red-500 bg-red-950/30';
   else if (status === 'patched') statusStyles = 'border-emerald-500 bg-emerald-950/20';
 
+  if (isSelected) {
+    statusStyles += ' border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)] z-10 relative';
+  }
+
   return (
-    <div className={`p-3 min-w-[200px] border font-mono text-xs text-zinc-200 ${statusStyles} rounded-none`}>
+    <div className={`p-3 min-w-[200px] border font-mono text-xs text-zinc-200 ${statusStyles} rounded-none transition-all duration-200 cursor-pointer hover:bg-zinc-800/80`}>
       <Handle type="target" position={Position.Top} className="w-2 h-2 rounded-none bg-zinc-500 border-none" />
       <div className="flex justify-between items-center border-b border-zinc-800 pb-2 mb-2">
         <span className="font-bold tracking-wider uppercase">{label || type || 'UNKNOWN'}</span>
@@ -54,16 +59,16 @@ const nodeTypes = {
 };
 
 export default function GraphCanvas() {
-  const { nodes, edges } = useTwinStore();
+  const { nodes, edges, selectedNode, selectNode } = useTwinStore();
 
   const flowNodes: Node[] = useMemo(() => {
     return nodes.map((n) => ({
       id: n.id,
       position: n.position || { x: Math.random() * 200, y: Math.random() * 200 },
-      data: n,
+      data: { ...n, isSelected: selectedNode === n.id },
       type: 'custom',
     }));
-  }, [nodes]);
+  }, [nodes, selectedNode]);
 
   const flowEdges: Edge[] = useMemo(() => {
     return edges.map((e) => {
@@ -92,17 +97,26 @@ export default function GraphCanvas() {
     });
   }, [edges]);
 
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    selectNode(node.id);
+  }, [selectNode]);
+
+  const onPaneClick = useCallback(() => {
+    selectNode(null);
+  }, [selectNode]);
+
   return (
     <div className="w-full h-full min-h-[400px] bg-zinc-950 border border-zinc-800 rounded-none relative">
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
         nodeTypes={nodeTypes}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         fitView
-        className="bg-zinc-950"
       >
-        <Background color="#27272a" gap={16} />
-        <Controls className="fill-zinc-400 border-zinc-800" showInteractive={false} />
+        <Background color="#27272a" />
+        <Controls className="bg-zinc-900 border-zinc-800 fill-zinc-400" />
       </ReactFlow>
     </div>
   );

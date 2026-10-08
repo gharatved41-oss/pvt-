@@ -1,39 +1,42 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useTwinStore } from '@/store/useTwinStore';
-import { getAiRemediation } from '@/lib/apiClient';
 
 export default function RemediationPanel() {
-  const { simulationStatus, activePatch, applyRemediation, nodes } = useTwinStore();
-  const [aiPatch, setAiPatch] = useState<string | null>(null);
-  const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const { simulationStatus, remediationPatch, applyRemediation } = useTwinStore();
 
-  useEffect(() => {
-    if (simulationStatus === 'COMPLETED' && activePatch) {
-      const fetchPatch = async () => {
-        setIsSynthesizing(true);
-        const targetNode = nodes.find((n) => n.id === activePatch.targetNodeId);
-        const patchData = await getAiRemediation(
-          targetNode?.cve || 'Generic Vulnerability',
-          `Node: ${targetNode?.label || 'Unknown'} IP: ${targetNode?.ipAddress || '0.0.0.0'}`
-        );
-        setAiPatch(patchData.patch);
-        setIsSynthesizing(false);
-      };
-      fetchPatch();
-    } else {
-      setAiPatch(null);
+  const renderContent = () => {
+    if (simulationStatus === 'IDLE' || simulationStatus === 'PATCHED') {
+      return (
+        <div className="h-full w-full flex items-center justify-center text-center text-zinc-500">
+          [REMEDIATION_PANEL_STANDBY]<br/>Awaiting adversarial validation...
+        </div>
+      );
     }
-  }, [simulationStatus, activePatch, nodes]);
 
-  if (simulationStatus !== 'COMPLETED' || !activePatch) {
-    return (
-      <div className="h-full w-full bg-zinc-950 p-4 font-mono text-xs text-zinc-500 flex items-center justify-center">
-        [REMEDIATION_PANEL_OFFLINE] Awaiting simulation completion.
-      </div>
-    );
-  }
+    if (simulationStatus === 'SCANNING' || (simulationStatus === 'COMPROMISED' && !remediationPatch)) {
+      return (
+        <div className="flex flex-col gap-2 p-3">
+          <div className="animate-pulse bg-zinc-800 h-4 w-3/4 rounded-sm" />
+          <div className="animate-pulse bg-zinc-800 h-4 w-1/2 rounded-sm" />
+          <div className="animate-pulse bg-zinc-800 h-4 w-5/6 rounded-sm" />
+        </div>
+      );
+    }
+
+    if (simulationStatus === 'COMPROMISED' && remediationPatch) {
+      return (
+        <pre className="h-full overflow-x-auto overflow-y-auto p-3">
+          <code className="font-mono text-[10px] text-emerald-400 whitespace-pre-wrap">
+            {remediationPatch}
+          </code>
+        </pre>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="h-full w-full bg-zinc-950 p-4 font-mono text-xs flex flex-col">
@@ -41,16 +44,16 @@ export default function RemediationPanel() {
         // AI Remediation Synthesis
       </div>
       
-      <div className="flex-1 bg-zinc-900 border border-zinc-700 text-emerald-400 p-3 overflow-x-auto overflow-y-auto mb-4 whitespace-pre-wrap">
-        {isSynthesizing ? "> Synthesizing deterministic patch via Gemini Flash..." : aiPatch || "> Patch unavailable."}
+      <div className="flex-1 bg-zinc-900 border border-zinc-700 overflow-hidden mb-4">
+        {renderContent()}
       </div>
 
       <button
         onClick={() => applyRemediation()}
-        disabled={isSynthesizing || !aiPatch}
-        className="w-full shrink-0 bg-zinc-200 text-zinc-950 font-bold py-2 hover:bg-white disabled:opacity-50 transition-colors uppercase rounded-none"
+        disabled={simulationStatus !== 'COMPROMISED' || !remediationPatch}
+        className="w-full shrink-0 bg-emerald-950 border border-emerald-800 text-emerald-400 font-bold py-2 hover:bg-emerald-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase rounded-none"
       >
-        Execute Remediation Protocol
+        Apply Patch & Re-Test
       </button>
     </div>
   );
