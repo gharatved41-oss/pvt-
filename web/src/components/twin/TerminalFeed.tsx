@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useTwinStore } from '@/store/useTwinStore';
 
-export default function TerminalFeed() {
+export default function TerminalFeed({ className }: { className?: string }) {
   const { logs, clearLogs } = useTwinStore();
   const feedRef = useRef<HTMLDivElement>(null);
 
@@ -24,7 +24,7 @@ export default function TerminalFeed() {
   };
 
   return (
-    <div className="flex flex-col h-full border border-zinc-800 bg-zinc-950 font-mono text-[11px] rounded-none">
+    <div className={`flex flex-col h-full border border-zinc-800 bg-zinc-950 font-mono text-[11px] rounded-none ${className || ''}`}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/50 px-3 py-2">
         <div className="flex items-center gap-2">

@@ -160,7 +160,7 @@ export function generateExecutivePdf(data: ReportAssessmentData): jsPDF {
     margin: { left: 14, right: 14 },
   });
 
-  currentY = (doc as any).lastAutoTable.finalY + 10;
+  currentY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
 
   // 4. Validated Vulnerability Findings Details Table
   doc.setFont('helvetica', 'bold');
@@ -205,7 +205,7 @@ export function generateExecutivePdf(data: ReportAssessmentData): jsPDF {
     margin: { left: 14, right: 14 },
   });
 
-  currentY = (doc as any).lastAutoTable.finalY + 10;
+  currentY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
 
   // 5. Remediation & Proof of Fix Section
   doc.setFont('helvetica', 'bold');

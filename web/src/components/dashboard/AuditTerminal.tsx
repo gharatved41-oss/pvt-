@@ -1,1 +1,1 @@
-export { TerminalFeed as AuditTerminal } from '@/components/twin/TerminalFeed';
+export { default as AuditTerminal } from '@/components/twin/TerminalFeed';

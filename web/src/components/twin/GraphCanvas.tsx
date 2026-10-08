@@ -5,9 +5,17 @@ import { ReactFlow, Background, Controls, NodeProps, Edge, Node, Handle, Positio
 import '@xyflow/react/dist/style.css';
 import { useTwinStore } from '@/store/useTwinStore';
 
+interface CustomNodeData extends Record<string, unknown> {
+  label?: string;
+  type?: string;
+  ipAddress?: string;
+  status?: 'healthy' | 'probing' | 'compromised' | 'patched';
+  services?: Array<{ port: number; serviceName: string }>;
+}
+
 // Custom Node Component
 const CustomNode = ({ data }: NodeProps) => {
-  const { label, type, ipAddress, status, services = [] } = data as any;
+  const { label, type, ipAddress, status, services = [] } = data as CustomNodeData;
 
   let statusStyles = 'border-zinc-800 bg-zinc-900/60';
   if (status === 'probing') statusStyles = 'border-amber-500/80 bg-amber-950/20';
@@ -26,7 +34,7 @@ const CustomNode = ({ data }: NodeProps) => {
         <div className="text-zinc-400 mt-2">Services:</div>
         {services.length > 0 ? (
           <ul className="space-y-0.5">
-            {services.map((svc: any, idx: number) => (
+            {services.map((svc: { port: number; serviceName: string }, idx: number) => (
               <li key={idx} className="text-[10px] pl-2 border-l border-zinc-700">
                 Port {svc.port}: {svc.serviceName}
               </li>

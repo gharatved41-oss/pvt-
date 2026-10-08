@@ -1,1 +1,1 @@
-export { GraphCanvas } from '@/components/twin/GraphCanvas';
+export { default as GraphCanvas } from '@/components/twin/GraphCanvas';

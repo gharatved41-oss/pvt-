@@ -2,9 +2,19 @@
 
 import React, { useEffect } from 'react';
 import TopNav from '@/components/layout/TopNav';
-import GraphCanvas from '@/components/twin/GraphCanvas';
-import TerminalFeed from '@/components/twin/TerminalFeed';
-import RemediationPanel from '@/components/twin/RemediationPanel';
+import dynamic from "next/dynamic";
+const GraphCanvas = dynamic(
+  () => import("@/components/twin/GraphCanvas"),
+  { ssr: false, loading: () => <div className="h-full w-full bg-zinc-950 font-mono text-xs text-zinc-500 p-4">Loading topology engine...</div> }
+);
+const TerminalFeed = dynamic(
+  () => import("@/components/twin/TerminalFeed"),
+  { ssr: false }
+);
+const RemediationPanel = dynamic(
+  () => import("@/components/twin/RemediationPanel"),
+  { ssr: false }
+);
 import { useTwinStore } from '@/store/useTwinStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';

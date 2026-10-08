@@ -91,14 +91,14 @@ export function AttackGraph({
       const isTargeted = activePathNodeIds.includes(node.id);
       let runtimeStatus = node.status;
       if (node.status === 'healthy' && isTargeted) {
-        runtimeStatus = 'targeted' as any;
+        runtimeStatus = 'targeted' as typeof node.status;
       }
 
       const nodeData: AssetNodeData = {
         id: node.id,
         name: node.name,
         type: node.type,
-        status: runtimeStatus as any,
+        status: runtimeStatus as AssetNodeData['status'],
         ipAddress: node.properties.ipAddress,
         hostname: node.properties.hostname,
         openPorts: node.properties.openPorts,

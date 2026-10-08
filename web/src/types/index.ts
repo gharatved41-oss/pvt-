@@ -8,7 +8,7 @@ export interface CustomUserClaims {
 export interface ScanUsage {
   currentDayCount: number;
   currentMonthCount: number;
-  lastResetDate: any;
+  lastResetDate: string | number;
 }
 
 export interface UserProfile {
@@ -16,7 +16,7 @@ export interface UserProfile {
   email: string | null;
   role: UserRole;
   scanUsage?: ScanUsage;
-  createdAt?: any;
+  createdAt?: string | number;
 }
 
 export type EnvironmentStatus = 'idle' | 'cloning' | 'ready' | 'simulating';
@@ -27,8 +27,8 @@ export interface Environment {
   ownerId: string;
   targetDomain: string;
   status: EnvironmentStatus;
-  createdAt: any;
-  updatedAt?: any;
+  createdAt: string | number;
+  updatedAt?: string | number;
 }
 
 export type SimulationStatus = 'queued' | 'running' | 'completed' | 'failed';
@@ -48,8 +48,8 @@ export interface Simulation {
   summary?: string;
   exploitsAttempted: number;
   provenExploitable: number;
-  createdAt: any;
-  completedAt?: any;
+  createdAt: string | number;
+  completedAt?: string | number;
 }
 
 export interface SimulationEvent {
@@ -58,7 +58,7 @@ export interface SimulationEvent {
   targetNodeId: string;
   severity: 'info' | 'warning' | 'critical';
   message: string;
-  timestamp: any;
+  timestamp: string | number;
 }
 
 export interface InitiateScanResult {
@@ -90,7 +90,7 @@ export interface NodeProperties {
   cveExposures?: string[];
   syntheticRecordsCount?: number;
   syntheticDataRef?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface TwinNode {
@@ -99,9 +99,9 @@ export interface TwinNode {
   type: NodeType;
   properties: NodeProperties;
   status: NodeStatus;
-  compromiseTimestamp?: any;
+  compromiseTimestamp?: string | number;
   compromiseVector?: string;
-  updatedAt?: any;
+  updatedAt?: string | number;
 }
 
 export type EdgeProtocol = 'TCP' | 'UDP' | 'HTTP';
@@ -115,7 +115,7 @@ export interface TwinEdge {
   port: number;
   accessState: EdgeAccessState;
   ruleDescription?: string;
-  updatedAt?: any;
+  updatedAt?: string | number;
 }
 
 export type DigitalTwinStatus = 'cloning' | 'synthesizing' | 'ready' | 'simulating' | 'failed';
@@ -129,8 +129,8 @@ export interface DigitalTwinDocument {
   nodeCount: number;
   edgeCount: number;
   syntheticRecordsGenerated: number;
-  createdAt: any;
-  updatedAt: any;
-  lastSimulatedAt?: any;
+  createdAt: string | number;
+  updatedAt: string | number;
+  lastSimulatedAt?: string | number;
 }
 
