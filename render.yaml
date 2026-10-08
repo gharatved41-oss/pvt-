@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: vulntwin-api
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    disk:
+      name: vulntwin-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:////data/autosectwin.db
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: VIRUSTOTAL_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
