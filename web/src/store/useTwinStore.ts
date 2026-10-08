@@ -11,7 +11,7 @@ import {
   NodeStatus,
 } from '@/lib/mockData';
 import { useAuthStore } from './useAuthStore';
-
+import { runThreatScan, getAiRemediation } from '@/lib/apiClient';
 export type SimulationStatus = 'IDLE' | 'RUNNING' | 'COMPLETED';
 
 interface TwinStoreState {
@@ -219,10 +219,8 @@ export const useTwinStore = create<TwinStoreState>((set, get) => {
       const freshNodes: TwinNodeData[] = JSON.parse(JSON.stringify(activeTemplate.nodes));
       const freshEdges: TwinEdgeData[] = JSON.parse(JSON.stringify(activeTemplate.edges));
 
-      const isEcommerce = activeTemplate.id === 'ecommerce';
       const rootNode = freshNodes[0];
-      const computeNode = freshNodes[1];
-      const dbNode = freshNodes[freshNodes.length - 1];
+      const targetUrl = `http://${rootNode.ipAddress || '127.0.0.1'}`;
 
       const startLog: TelemetryEvent = {
         id: `sim-start-${Date.now()}`,
@@ -231,7 +229,7 @@ export const useTwinStore = create<TwinStoreState>((set, get) => {
         severity: 'INFO',
         targetNodeId: rootNode.id,
         targetIp: rootNode.ipAddress || '0.0.0.0',
-        message: `[INGRESS_DISCOVERY] Ingress edge evaluated: ${rootNode.label || rootNode.name} (${rootNode.ipAddress || '0.0.0.0'}:443 -> ACCEPT).`,
+        message: `[INGRESS_DISCOVERY] Initiating threat scan against: ${targetUrl}`,
       };
 
       set({
@@ -242,177 +240,63 @@ export const useTwinStore = create<TwinStoreState>((set, get) => {
         activePatch: null,
         isPatchApplied: false,
         remediationStatus: 'IDLE',
-        riskScore: 15,
-        simulationProgress: 10,
+        riskScore: 0,
+        simulationProgress: 50,
         logs: [...get().logs, startLog],
         eventLogs: [...get().eventLogs, startLog],
       });
 
-      // TIMEOUT 1 (1.0s): Port Evaluation & Probe Compute Node
-      const t1 = setTimeout(() => {
-        set((state) => {
-          const updatedNodes = state.nodes.map((n) =>
-            n.id === computeNode.id ? { ...n, status: 'probing' as NodeStatus } : n
-          );
-          const updatedEdges = state.edges.map((e, idx) =>
-            idx === 0 ? { ...e, isTraversed: true } : e
-          );
+      // Execute actual API call
+      const scanResult = await runThreatScan(targetUrl);
 
-          const log: TelemetryEvent = {
-            id: `step-1-${Date.now()}`,
-            timestamp: getTimestamp(),
-            step: 'PORT_EVALUATION',
-            severity: 'WARN',
-            targetNodeId: computeNode.id,
-            targetIp: computeNode.ipAddress || '0.0.0.0',
-            message: `[PORT_EVALUATION] Probing ${computeNode.label || computeNode.name} (${computeNode.ipAddress || '0.0.0.0'}). Service: ${computeNode.services?.[0]?.serviceName} (${computeNode.services?.[0]?.version}) detected.`,
-          };
+      set((state) => {
+        const isMalicious = scanResult.verdict === 'MALICIOUS' || scanResult.risk_score >= 75;
+        const finalStatus: NodeStatus = isMalicious ? 'compromised' : (scanResult.risk_score >= 25 ? 'probing' : 'healthy');
 
-          return {
-            nodes: updatedNodes,
-            edges: updatedEdges,
-            simulationProgress: 35,
-            riskScore: 42,
-            logs: [...state.logs, log],
-            eventLogs: [...state.eventLogs, log],
-          };
-        });
-      }, 1000);
-      activeTimers.push(t1);
+        const updatedNodes = state.nodes.map((n, idx) =>
+          idx > 0 ? { ...n, status: finalStatus } : n
+        );
+        const updatedEdges = state.edges.map((e) => ({ ...e, isTraversed: true }));
 
-      // TIMEOUT 2 (2.5s): Exploit Verified on Compute Tier
-      const t2 = setTimeout(() => {
-        set((state) => {
-          const updatedNodes = state.nodes.map((n) =>
-            n.id === computeNode.id ? { ...n, status: 'compromised' as NodeStatus } : n
-          );
+        const resultLog: TelemetryEvent = {
+          id: `scan-${Date.now()}`,
+          timestamp: getTimestamp(),
+          step: 'EXPLOIT_VERIFIED',
+          severity: isMalicious ? 'CRIT' : (scanResult.risk_score >= 25 ? 'WARN' : 'INFO'),
+          targetNodeId: rootNode.id,
+          targetIp: rootNode.ipAddress || '0.0.0.0',
+          message: `[SCAN_COMPLETE] Verdict: ${scanResult.verdict} | Score: ${scanResult.risk_score}. Engine: ${scanResult.heuristics_applied ? 'Heuristics' : 'Provider API'}`,
+        };
 
-          const log: TelemetryEvent = {
-            id: `step-2-${Date.now()}`,
-            timestamp: getTimestamp(),
-            step: 'EXPLOIT_VERIFIED',
-            severity: 'CRIT',
-            targetNodeId: computeNode.id,
-            targetIp: computeNode.ipAddress || '0.0.0.0',
-            message: `[EXPLOIT_VERIFIED] ${computeNode.cve || 'CVE-2024-21338'} confirmed reachable. Ingress validation succeeded. Remote code execution simulated.`,
-          };
-
-          return {
-            nodes: updatedNodes,
-            simulationProgress: 60,
-            riskScore: 68,
-            logs: [...state.logs, log],
-            eventLogs: [...state.eventLogs, log],
-          };
-        });
-      }, 2500);
-      activeTimers.push(t2);
-
-      // TIMEOUT 3 (4.0s): Lateral Pivot Evaluation
-      const t3 = setTimeout(() => {
-        set((state) => {
-          const updatedEdges = state.edges.map((e) =>
-            e.target === dbNode.id ? { ...e, isTraversed: true } : e
-          );
-          const updatedNodes = state.nodes.map((n) =>
-            n.id === dbNode.id ? { ...n, status: 'probing' as NodeStatus } : n
-          );
-
-          const log1: TelemetryEvent = {
-            id: `step-3a-${Date.now()}`,
-            timestamp: getTimestamp(),
-            step: 'LATERAL_PIVOT',
-            severity: 'WARN',
-            targetNodeId: dbNode.id,
-            targetIp: dbNode.ipAddress || '0.0.0.0',
-            message: `[LATERAL_PIVOT] Evaluating internal firewall edge: ${computeNode.label || computeNode.name} -> ${dbNode.label || dbNode.name}.`,
-          };
-
-          const log2: TelemetryEvent = {
-            id: `step-3b-${Date.now()}`,
-            timestamp: getTimestamp(),
-            step: 'EXPLOIT_VERIFIED',
-            severity: 'CRIT',
-            targetNodeId: dbNode.id,
-            targetIp: dbNode.ipAddress || '0.0.0.0',
-            message: `[EXPLOIT_VERIFIED] Edge policy permissive (Port ${isEcommerce ? 5432 : 27017} unsegmented). Lateral pivot successful.`,
-          };
-
-          return {
-            edges: updatedEdges,
-            nodes: updatedNodes,
-            simulationProgress: 80,
-            riskScore: 82,
-            logs: [...state.logs, log1, log2],
-            eventLogs: [...state.eventLogs, log1, log2],
-          };
-        });
-      }, 4000);
-      activeTimers.push(t3);
-
-      // TIMEOUT 4 (5.5s): Blast Radius Established & Simulation Completed
-      const t4 = setTimeout(() => {
-        set((state) => {
-          const updatedNodes = state.nodes.map((n) =>
-            n.id === dbNode.id ? { ...n, status: 'compromised' as NodeStatus } : n
-          );
-
-          // Calculate Blast Radius compound risk score:
-          // R = min(100, sum(Ci * 8) + log10(D + 1) * 5 - (Path Length * 2))
-          const compromised = updatedNodes.filter((n) => n.status === 'compromised');
-          const sumCriticality = compromised.reduce((acc, n) => acc + (n.criticality || 5), 0);
-          const syntheticRecords = dbNode.syntheticRecordsCount || 50000;
-          const logRecords = Math.log10(syntheticRecords + 1) * 5;
-          const pathLength = 2;
-          const calculatedScore = Math.min(
-            100,
-            Math.round(sumCriticality * 8 + logRecords - pathLength * 2)
-          );
-
-          const log1: TelemetryEvent = {
-            id: `step-4a-${Date.now()}`,
-            timestamp: getTimestamp(),
-            step: 'BLAST_RADIUS_ESTABLISHED',
-            severity: 'CRIT',
-            targetNodeId: dbNode.id,
-            targetIp: dbNode.ipAddress || '0.0.0.0',
-            message: `[BLAST_RADIUS_ESTABLISHED] Node [${dbNode.label || dbNode.name}] compromised. ${syntheticRecords.toLocaleString()} synthetic records exposed.`,
-          };
-
-          const log2: TelemetryEvent = {
-            id: `step-4b-${Date.now()}`,
-            timestamp: getTimestamp(),
-            step: 'BLAST_RADIUS_ESTABLISHED',
-            severity: 'INFO',
-            targetNodeId: 'summary',
-            targetIp: '0.0.0.0',
-            message: `[COMPLETED] Adversarial simulation complete. Compound Risk Score: ${calculatedScore}/100 [CRITICAL]. Remediation patch prepared.`,
-          };
-
-          return {
-            nodes: updatedNodes,
-            simulationStatus: 'COMPLETED',
-            simulationState: 'COMPLETED',
-            simulationProgress: 100,
-            riskScore: calculatedScore,
-            activePatch: activeTemplate.patch,
-            logs: [...state.logs, log1, log2],
-            eventLogs: [...state.eventLogs, log1, log2],
-          };
-        });
-      }, 5500);
-      activeTimers.push(t4);
+        return {
+          nodes: updatedNodes,
+          edges: updatedEdges,
+          simulationStatus: 'COMPLETED',
+          simulationState: 'COMPLETED',
+          simulationProgress: 100,
+          riskScore: scanResult.risk_score || 0,
+          activePatch: activeTemplate.patch,
+          logs: [...state.logs, resultLog],
+          eventLogs: [...state.eventLogs, resultLog],
+        };
+      });
     },
 
     runSimulation: () => {
       get().runValidation();
     },
 
-    applyRemediation: (edgeId?: string) => {
+    applyRemediation: async (edgeId?: string) => {
       const { activePatch, nodes, edges } = get();
       if (!activePatch) return;
 
       const targetEdge = edgeId || activePatch.targetEdgeId;
+      const targetNode = nodes.find((n) => n.id === activePatch.targetNodeId);
+
+      const patchData = await getAiRemediation(
+        targetNode?.cve || 'Generic Vulnerability',
+        `Node: ${targetNode?.label || 'Unknown'} IP: ${targetNode?.ipAddress || '0.0.0.0'}`
+      );
 
       // Close the permissive edge
       const updatedEdges = edges.map((e) =>
@@ -436,7 +320,7 @@ export const useTwinStore = create<TwinStoreState>((set, get) => {
         severity: 'INFO',
         targetNodeId: activePatch.targetNodeId,
         targetIp: '0.0.0.0',
-        message: `[AEV_REMEDIATION] Applying infrastructure rule: "${activePatch.machineAction}" to digital twin edge [${targetEdge}]. Edge closed.`,
+        message: `[AI_REMEDIATION] Applying patch (Source: ${patchData.source}):\n${patchData.patch}\nEdge [${targetEdge}] closed.`,
       };
 
       const patchLog2: TelemetryEvent = {
@@ -446,7 +330,7 @@ export const useTwinStore = create<TwinStoreState>((set, get) => {
         severity: 'SUCCESS',
         targetNodeId: activePatch.targetNodeId,
         targetIp: '0.0.0.0',
-        message: `[SUCCESS] Lateral path severed. Autonomous verification re-test passed: Port restricted. Blast radius neutralized. Node status: PATCHED. Status: VERIFIED_SAFE.`,
+        message: `[SUCCESS] Lateral path severed. Autonomous verification re-test passed. Node status: PATCHED.`,
       };
 
       set((state) => ({
@@ -454,7 +338,7 @@ export const useTwinStore = create<TwinStoreState>((set, get) => {
         edges: updatedEdges,
         isPatchApplied: true,
         remediationStatus: 'VERIFIED_SAFE',
-        riskScore: 12,
+        riskScore: 0,
         logs: [...state.logs, patchLog1, patchLog2],
         eventLogs: [...state.eventLogs, patchLog1, patchLog2],
       }));

@@ -1,194 +1,100 @@
-'use client';
+"use client";
 
-import React, { useMemo, memo } from 'react';
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  MarkerType,
-  Node as FlowNode,
-  Edge as FlowEdge,
-  Handle,
-  Position,
-  NodeProps,
-  ConnectionMode,
-} from '@xyflow/react';
+import React, { useMemo } from 'react';
+import { ReactFlow, Background, Controls, NodeProps, Edge, Node, Handle, Position } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useTwinEngine, Node as EngineNode, NodeStatus } from '@/store/useTwinEngine';
+import { useTwinStore } from '@/store/useTwinStore';
 
-interface AustereNodeData {
-  node: EngineNode;
-  [key: string]: unknown;
-}
+// Custom Node Component
+const CustomNode = ({ data }: NodeProps) => {
+  const { label, type, ipAddress, status, services = [] } = data as any;
 
-/**
- * Austere Node Component
- * - Pure dark mode: bg-zinc-950, border-zinc-800
- * - If compromised: border-red-500
- * - If patched: border-emerald-500
- * - If probing: border-amber-500
- */
-const AustereNode = memo(({ data, selected }: NodeProps) => {
-  const node = (data as unknown as AustereNodeData).node;
-
-  const getBorderColor = (status: NodeStatus) => {
-    switch (status) {
-      case 'compromised':
-        return 'border-red-500 text-red-400';
-      case 'patched':
-        return 'border-emerald-500 text-emerald-400';
-      case 'probing':
-        return 'border-amber-500 text-amber-400';
-      case 'healthy':
-      default:
-        return 'border-zinc-800 text-zinc-300';
-    }
-  };
-
-  const getStatusBadge = (status: NodeStatus) => {
-    switch (status) {
-      case 'compromised':
-        return <span className="text-red-500 font-bold">[COMPROMISED]</span>;
-      case 'patched':
-        return <span className="text-emerald-400 font-bold">[PATCHED]</span>;
-      case 'probing':
-        return <span className="text-amber-400 font-bold animate-pulse">[PROBING]</span>;
-      case 'healthy':
-      default:
-        return <span className="text-zinc-500">[HEALTHY]</span>;
-    }
-  };
-
-  const statusClass = getBorderColor(node.status);
+  let statusStyles = 'border-zinc-800 bg-zinc-900/60';
+  if (status === 'probing') statusStyles = 'border-amber-500/80 bg-amber-950/20';
+  else if (status === 'compromised') statusStyles = 'border-red-500 bg-red-950/30';
+  else if (status === 'patched') statusStyles = 'border-emerald-500 bg-emerald-950/20';
 
   return (
-    <div
-      className={`w-64 bg-zinc-950 border ${statusClass} rounded-none p-3.5 font-mono select-none transition-colors duration-150 ${
-        selected ? 'ring-1 ring-zinc-400' : ''
-      }`}
-    >
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="w-2 h-2 !bg-zinc-700 !border !border-zinc-950 rounded-none"
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="w-2 h-2 !bg-zinc-700 !border !border-zinc-950 rounded-none"
-      />
-
-      <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-900 text-[10px]">
-        <span className="text-zinc-500 uppercase tracking-widest">{node.type}</span>
-        {getStatusBadge(node.status)}
+    <div className={`p-3 min-w-[200px] border font-mono text-xs text-zinc-200 ${statusStyles} rounded-none`}>
+      <Handle type="target" position={Position.Top} className="w-2 h-2 rounded-none bg-zinc-500 border-none" />
+      <div className="flex justify-between items-center border-b border-zinc-800 pb-2 mb-2">
+        <span className="font-bold tracking-wider uppercase">{label || type || 'UNKNOWN'}</span>
+        <span className="text-[10px] uppercase px-1.5 py-0.5 bg-zinc-800 text-zinc-300">{status || 'healthy'}</span>
       </div>
-
-      <div className="text-xs font-bold text-zinc-100 uppercase tracking-tight mb-2">
-        {node.label}
-      </div>
-
-      <div className="space-y-1 text-[11px] text-zinc-400">
-        <div className="flex justify-between">
-          <span className="text-zinc-600">IP:</span>
-          <span className="text-zinc-200">{node.ip}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-zinc-600">CRITICALITY:</span>
-          <span className="text-amber-400 font-bold">{node.criticality}/10</span>
-        </div>
-        {node.cve && (
-          <div className="flex justify-between">
-            <span className="text-zinc-600">VULN:</span>
-            <span className="text-red-400 font-bold">{node.cve}</span>
-          </div>
+      <div className="space-y-1">
+        <div className="text-zinc-400">IP: <span className="text-zinc-200">{ipAddress || '0.0.0.0'}</span></div>
+        <div className="text-zinc-400 mt-2">Services:</div>
+        {services.length > 0 ? (
+          <ul className="space-y-0.5">
+            {services.map((svc: any, idx: number) => (
+              <li key={idx} className="text-[10px] pl-2 border-l border-zinc-700">
+                Port {svc.port}: {svc.serviceName}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-[10px] text-zinc-500 italic pl-2">No services detected</div>
         )}
       </div>
+      <Handle type="source" position={Position.Bottom} className="w-2 h-2 rounded-none bg-zinc-500 border-none" />
     </div>
   );
-});
-
-AustereNode.displayName = 'AustereNode';
-
-const nodeTypes = {
-  austereNode: AustereNode,
 };
 
-export function GraphCanvas() {
-  const { nodes: engineNodes, edges: engineEdges, selectNode } = useTwinEngine();
+const nodeTypes = {
+  custom: CustomNode,
+};
 
-  // Map Zustand nodes into React Flow format
-  const flowNodes: FlowNode[] = useMemo(() => {
-    return engineNodes.map((node) => ({
-      id: node.id,
-      type: 'austereNode',
-      position: node.position || { x: 100, y: 100 },
-      data: { node } as AustereNodeData,
+export default function GraphCanvas() {
+  const { nodes, edges } = useTwinStore();
+
+  const flowNodes: Node[] = useMemo(() => {
+    return nodes.map((n) => ({
+      id: n.id,
+      position: n.position || { x: Math.random() * 200, y: Math.random() * 200 },
+      data: n,
+      type: 'custom',
     }));
-  }, [engineNodes]);
+  }, [nodes]);
 
-  // Map Zustand edges into React Flow format
-  const flowEdges: FlowEdge[] = useMemo(() => {
-    return engineEdges.map((edge) => {
-      const isBlocked = edge.accessState === 'blocked';
-      const isTraversed = edge.isTraversed;
+  const flowEdges: Edge[] = useMemo(() => {
+    return edges.map((e) => {
+      let stroke = '#52525b'; // zinc-600
+      let animated = false;
+      let strokeDasharray = undefined;
 
-      let strokeColor = '#27272a'; // zinc-800
-      if (isBlocked) strokeColor = '#52525b'; // zinc-600
-      else if (isTraversed) strokeColor = '#ef4444'; // red-500
+      if (e.isTraversed) {
+        stroke = '#ef4444'; // red-500
+        animated = true;
+      }
+      
+      if (e.accessState === 'blocked') {
+        stroke = '#10b981'; // emerald-500
+        animated = false;
+        strokeDasharray = '5 5';
+      }
 
       return {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        animated: isTraversed && !isBlocked,
-        label: isBlocked ? `BLOCKED :${edge.port}` : `:${edge.port}`,
-        labelStyle: {
-          fill: isBlocked ? '#71717a' : isTraversed ? '#f87171' : '#a1a1aa',
-          fontWeight: 700,
-          fontSize: '10px',
-          fontFamily: 'monospace',
-        },
-        labelBgStyle: {
-          fill: '#09090b',
-          stroke: isBlocked ? '#3f3f46' : isTraversed ? '#7f1d1d' : '#27272a',
-          strokeWidth: 1,
-        },
-        style: {
-          stroke: strokeColor,
-          strokeWidth: isTraversed ? 2 : 1.5,
-          strokeDasharray: isBlocked ? '4 4' : undefined,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: strokeColor,
-          width: 12,
-          height: 12,
-        },
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        animated,
+        style: { stroke, strokeWidth: 2, strokeDasharray },
       };
     });
-  }, [engineEdges]);
+  }, [edges]);
 
   return (
-    <div className="w-full h-full relative bg-zinc-950 flex flex-col min-h-0 select-none">
+    <div className="w-full h-full min-h-[400px] bg-zinc-950 border border-zinc-800 rounded-none relative">
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
         nodeTypes={nodeTypes}
-        onNodeClick={(_, node) => selectNode(node.id)}
-        onPaneClick={() => selectNode(null)}
-        connectionMode={ConnectionMode.Loose}
         fitView
-        fitViewOptions={{ padding: 0.25 }}
-        minZoom={0.4}
-        maxZoom={1.5}
-        proOptions={{ hideAttribution: true }}
         className="bg-zinc-950"
       >
-        <Background color="#18181b" gap={20} size={1} />
-        <Controls
-          showInteractive={false}
-          className="!bg-zinc-950 !border-zinc-800 !rounded-none !text-zinc-400 [&>button]:!border-zinc-800 [&>button]:!bg-zinc-950 [&>button:hover]:!bg-zinc-900"
-        />
+        <Background color="#27272a" gap={16} />
+        <Controls className="fill-zinc-400 border-zinc-800" showInteractive={false} />
       </ReactFlow>
     </div>
   );

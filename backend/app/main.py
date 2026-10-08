@@ -10,8 +10,9 @@ from backend.app.config import settings
 from backend.app.core.logging import logger
 from backend.app.db.init_db import init_database
 from backend.app.api.routes import (
-    analysis, history, dashboard, indicators, health, safepath, twin, auth
+    analysis, history, indicators, health, safepath, twin, auth
 )
+from backend.app.routers import dashboard, scanner, remediation
 
 
 @asynccontextmanager
@@ -34,7 +35,7 @@ app = FastAPI(
 # Enable CORS for local dev React SPA
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5000", "http://127.0.0.1:5000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,10 +46,14 @@ app.include_router(auth.router, prefix=settings.API_V1_STR, tags=["Authenticatio
 app.include_router(analysis.router, prefix=settings.API_V1_STR, tags=["Analysis"])
 app.include_router(history.router, prefix=settings.API_V1_STR, tags=["History & Memory"])
 app.include_router(indicators.router, prefix=settings.API_V1_STR, tags=["Indicators & Timeline"])
-app.include_router(dashboard.router, prefix=settings.API_V1_STR, tags=["Dashboard"])
 app.include_router(safepath.router, prefix=settings.API_V1_STR, tags=["SafePath"])
 app.include_router(twin.router, prefix=settings.API_V1_STR, tags=["Digital Twin"])
 app.include_router(health.router, prefix=settings.API_V1_STR, tags=["System Health"])
+
+# New Directives Routers
+app.include_router(dashboard.router)
+app.include_router(scanner.router)
+app.include_router(remediation.router)
 
 
 @app.get("/")
@@ -64,4 +69,4 @@ def read_root():
 
 @app.get("/health")
 def read_root_health():
-    return {"status": "operational", "project": settings.PROJECT_NAME, "version": settings.VERSION}
+    return {"status": "online", "database": "connected"}

@@ -22,11 +22,7 @@ export const functions: Functions = getFunctions(app);
 
 // Developer Email Identifiers for Role-Based Overrides
 export const ADMIN_EMAILS: string[] = [
-  (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim(),
-  'your_email@gmail.com',
-  'sara.dongare@corp-sec.com',
-  'admin@vulntwin.ai',
-  'developer@vulntwin.ai',
+  (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim()
 ].filter(Boolean);
 
 export const signOut = () => firebaseSignOut(auth);
