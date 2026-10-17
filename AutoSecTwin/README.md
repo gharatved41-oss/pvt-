@@ -1,19 +1,20 @@
 # VulnTwin AI
 
-VulnTwin AI is an AI-assisted cybersecurity platform that analyzes URLs and security indicators, collects security evidence, calculates explainable risk scores, stores analysis history, and facilitates safe verification of findings inside an isolated Digital Twin lab.
+VulnTwin AI is an AI-assisted cybersecurity platform that analyzes URLs and security indicators, collects multi-source security evidence, calculates explainable risk scores, stores analysis history, and facilitates safe verification of findings inside an isolated Digital Twin lab.
 
 ---
 
 ## 🏗️ Architecture & Technology Stack
 
-- **Python**: 3.11+ (tested on Python 3.11, 3.12, 3.14)
+- **Python**: 3.11+ (compatible with Python 3.11, 3.12, 3.14)
 - **API Framework**: FastAPI
 - **ASGI Server**: Uvicorn
 - **Data Modeling & Validation**: Pydantic v2 / Pydantic Settings
 - **ORM & Database**: SQLAlchemy 2.0 with SQLite (Phase 1 / MVP) → PostgreSQL (Production)
 - **Testing**: Pytest & FastAPI TestClient / HTTPX
 - **Evidence Collection**: Pluggable Collector Architecture (`BaseCollector`, `CollectorManager`)
-- **Analysis Scope**: Purely local passive syntax & hostname analysis (no outbound network requests in Milestone 3)
+- **Threat Intelligence**: Pluggable Provider Architecture (`BaseThreatIntelProvider`, `MockThreatIntelProvider`)
+- **Analysis Scope**: Purely local passive syntax & hostname analysis + isolated mock threat intelligence (zero outbound network requests to submitted targets)
 - **Frontend**: React + Tailwind CSS (Future Phase)
 - **Verification Lab**: Isolated Docker containers (Future Phase)
 
@@ -39,15 +40,22 @@ AutoSecTwin/
 │   │   ├── models/
 │   │   │   ├── analysis.py                     # SQLAlchemy AnalysisRecord ORM model with lifecycle state machine
 │   │   │   └── evidence.py                     # SQLAlchemy SecurityEvidenceRecord ORM model
+│   │   ├── providers/
+│   │   │   ├── base.py                         # BaseThreatIntelProvider interface & error hierarchy
+│   │   │   ├── factory.py                      # Dynamic provider selection factory (Mock vs. VirusTotal)
+│   │   │   ├── mock_provider.py                # Deterministic in-memory MockThreatIntelProvider
+│   │   │   └── virustotal_provider.py          # Real VirusTotal API v3 provider with privacy filters
 │   │   ├── schemas/
 │   │   │   ├── analysis.py                     # Pydantic request & response models (AnalysisResponse, AnalysisDetailResponse)
 │   │   │   ├── evidence.py                     # Pydantic models for evidence items & collection status
-│   │   │   └── risk.py                         # Pydantic models for deterministic risk, confidence & exploitability
+│   │   │   ├── risk.py                         # Pydantic models for deterministic risk, confidence & exploitability
+│   │   │   └── threat_intel.py                 # Pydantic models for reputation lookup status and telemetry
 │   │   ├── services/
 │   │   │   ├── analysis_service.py             # Lifecycle transitions, evidence persistence & analysis orchestration
 │   │   │   ├── collector.py                    # Pluggable BaseCollector interface & safe CollectorManager
 │   │   │   ├── passive_analyzer.py             # Non-intrusive syntax and hostname characteristics analyzer
-│   │   │   └── risk_engine.py                  # Deterministic, explainable passive risk evaluation engine
+│   │   │   ├── risk_engine.py                  # Deterministic, explainable passive risk evaluation engine
+│   │   │   └── threat_intel_collector.py       # Adapter integrating threat intelligence into evidence pipeline
 │   │   ├── utils/
 │   │   │   └── url_validator.py                # Strict URL validation & canonicalization
 │   │   └── main.py                             # FastAPI initialization, lifespan & error handlers
@@ -56,13 +64,15 @@ AutoSecTwin/
 │   └── requirements.md                         # Functional & non-functional requirements
 ├── frontend/                                   # Future React/Tailwind frontend
 ├── digital-twin/                               # Future containerized lab environments
-├── tests/                                      # Automated test suite
+├── tests/                                      # Automated test suite (73 tests)
 │   ├── conftest.py                             # Isolated in-memory DB fixtures & TestClient
 │   ├── test_analyses.py                        # Tests for URL submission, validation & DB isolation
 │   ├── test_api_v1.py                          # Tests for API info and error handling
 │   ├── test_evidence_collector.py              # Tests for passive analyzer & collector error containment
 │   ├── test_health.py                          # Tests for health check endpoint
-│   └── test_lifecycle_and_risk.py              # Tests for status transitions, risk engine & evidence endpoints
+│   ├── test_lifecycle_and_risk.py              # Tests for status transitions, risk engine & evidence endpoints
+│   ├── test_threat_intel.py                    # Tests for threat intel mock provider, error modes & risk scoring
+│   └── test_virustotal_provider.py             # Tests for VirusTotal v3 provider, privacy filters & mocked HTTP responses
 └── README.md                                   # Setup and execution guide
 ```
 
@@ -156,12 +166,12 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/analyses" `
 
 ---
 
-### 2. Trigger Passive Evidence Collection & Risk Scoring (Milestone 3)
+### 2. Trigger Passive Evidence Collection & Risk Scoring (Milestones 3 & 4)
 - **Method**: `POST`
 - **Path**: `/api/v1/analyses/{analysis_id}/analyze`
 - **Status**: `200 OK` (or `409 Conflict` if the analysis is already completed/failed)
 
-Executes safe, non-intrusive local passive syntax analysis. Enforces valid lifecycle transitions (`pending` → `running` → `completed`), stores evidence items in the database, and produces an explainable risk evaluation.
+Executes safe, non-intrusive local passive syntax analysis and integrated threat intelligence lookups. Enforces valid lifecycle transitions (`pending` → `running` → `completed`), stores evidence items in SQLite, and computes explainable risk evaluation.
 
 **PowerShell Example**:
 ```powershell
@@ -172,7 +182,7 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/analyses/e4b1b
 ```json
 {
   "id": "e4b1bf18-09bc-4340-9a25-e51f28df1d03",
-  "url": "https://example.com/login",
+  "url": "https://malicious-threat.org/auth/login",
   "status": "completed",
   "created_at": "2026-10-17T05:00:00Z",
   "error_message": null,
@@ -189,21 +199,27 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/analyses/e4b1b
       "observation_timestamp": "2026-10-17T05:00:05Z"
     },
     {
-      "id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "id": "9c8b7a6d-5e4f-3a2b-1c0d-e5f6a7b8c9d0",
       "analysis_id": "e4b1bf18-09bc-4340-9a25-e51f28df1d03",
-      "signal_name": "explicit_port",
-      "observed_value": null,
-      "structured_data": { "default_scheme_port": 443 },
-      "evidence_source": "passive_syntax_analyzer",
-      "collection_status": "absent",
-      "explanatory_notes": "Target URL does not specify an explicit port; default scheme port applies.",
+      "signal_name": "mock_threat_intel_reputation",
+      "observed_value": "malicious",
+      "structured_data": {
+        "provider": "mock_threat_intel",
+        "lookup_status": "match",
+        "threat_verdict": "malicious",
+        "threat_score": 92,
+        "categories": ["phishing", "credential_theft"]
+      },
+      "evidence_source": "mock_threat_intel",
+      "collection_status": "observed",
+      "explanatory_notes": "Threat intelligence provider 'mock_threat_intel' returned a confirmed match: verdict='malicious' (score: 92/100, categories: phishing, credential_theft).",
       "observation_timestamp": "2026-10-17T05:00:05Z"
     }
   ],
   "risk_assessment": {
-    "risk_score": 20,
-    "risk_level": "low",
-    "confidence_level": "low",
+    "risk_score": 60,
+    "risk_level": "high",
+    "confidence_level": "medium",
     "exploitability": "unknown",
     "contributing_factors": [
       {
@@ -220,13 +236,19 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/analyses/e4b1b
         "signal_name": "sensitive_lexical_tokens",
         "score_delta": 15,
         "rationale": "URL path or query string contains authentication-related keywords: 'login'."
+      },
+      {
+        "signal_name": "mock_threat_intel_reputation",
+        "score_delta": 40,
+        "rationale": "Threat intelligence confirmed malicious reputation entry (malicious)."
       }
     ],
     "limitations": [
-      "Assessment is strictly based on local lexical syntax and hostname characteristics.",
-      "No outbound network requests or live target investigations were conducted in this milestone.",
-      "Confidence is rated LOW due to the purely syntactic and non-network nature of evidence.",
-      "Exploitability is marked UNKNOWN: syntactic signals cannot confirm actionable vulnerability."
+      "Assessment is based on local lexical syntax, hostname characteristics, and integrated threat telemetry.",
+      "No active target probing, penetration testing, or exploit execution was conducted in this milestone.",
+      "A no-match reputation result indicates an absence of known IOCs, not verified safety.",
+      "Confidence is calibrated strictly to the breadth of available evidence.",
+      "Exploitability is marked UNKNOWN: syntactic signals and external reputation cannot confirm actionable exploitability without sandbox verification."
     ]
   }
 }
@@ -234,77 +256,86 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/analyses/e4b1b
 
 ---
 
-### 3. Retrieve Evidence Observations for an Analysis (Milestone 3)
+### 3. Retrieve Evidence Observations for an Analysis
 - **Method**: `GET`
 - **Path**: `/api/v1/analyses/{analysis_id}/evidence`
 - **Status**: `200 OK`
 
-**PowerShell Example**:
 ```powershell
 Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/v1/analyses/e4b1bf18-09bc-4340-9a25-e51f28df1d03/evidence"
 ```
 
-**JSON Response**:
-```json
-{
-  "analysis_id": "e4b1bf18-09bc-4340-9a25-e51f28df1d03",
-  "items": [ ... ],
-  "total": 7,
-  "observed_count": 6,
-  "absent_count": 1,
-  "error_count": 0
-}
-```
-
 ---
 
-### 4. Retrieve Saved Analysis Records (Paginated)
-- **Method**: `GET`
-- **Path**: `/api/v1/analyses?limit=20&offset=0`
-- **Status**: `200 OK`
+## 🛡️ Threat Intelligence Architecture (Milestones 4 & 5)
 
-```powershell
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/v1/analyses?limit=10&offset=0"
-```
+### 1. Modular Provider Interface (`BaseThreatIntelProvider`)
+The platform decouples threat intelligence providers from API endpoints using an abstract base class. Providers implement:
+- `name`: unique provider identifier
+- `lookup(indicator, indicator_type)`: queries reputation and returns standardized [`ThreatIntelResult`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/schemas/threat_intel.py).
 
----
+### 2. In-Memory Mock Provider (`MockThreatIntelProvider`)
+For offline automated testing and zero-configuration development, [`MockThreatIntelProvider`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/mock_provider.py) operates locally without needing API keys or network requests:
+- **Pre-seeded Malicious Targets**: `malicious-threat.org`, `phishing-test.com` (verdict: `malicious`, score: 92/88)
+- **Pre-seeded Suspicious Targets**: `suspicious-cdn.org` (verdict: `suspicious`, score: 62)
+- **Error Simulation Triggers**:
+  - `simulate-timeout` → raises [`ThreatIntelTimeoutError`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/base.py#L18)
+  - `simulate-ratelimit` → raises [`ThreatIntelRateLimitError`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/base.py#L24)
+  - `simulate-invalid-response` → raises [`ThreatIntelInvalidResponseError`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/base.py#L30)
+  - `simulate-unavailable` → raises [`ThreatIntelUnavailableError`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/base.py#L36)
+- **Clean / Unlisted Targets**: Returns `lookup_status: "no_match"`.
 
-### 5. Retrieve an Individual Analysis Record
-- **Method**: `GET`
-- **Path**: `/api/v1/analyses/{analysis_id}`
-- **Status**: `200 OK` (or `404 Not Found`)
+### 3. Real Threat Intelligence Provider: VirusTotal v3 (`VirusTotalProvider`)
+Milestone 5 introduces real threat reputation telemetry via the official **VirusTotal API v3** ([`VirusTotalProvider`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/virustotal_provider.py)):
+- **API Specification**: Uses standard URL reputation lookup (`GET /api/v3/urls/{url_id}`), where `url_id` is computed via Base64url encoding without trailing padding characters (`=`).
+- **Reputation Lookup Only**: No active scanning or HTTP requests are ever made to the submitted target URL itself. Only pre-existing third-party threat engine telemetry is retrieved from VirusTotal.
+- **Provider Selection & Configuration**: Configured strictly via environment variables. API keys are never hardcoded or logged:
+  ```powershell
+  # Windows PowerShell
+  $env:THREAT_INTEL_PROVIDER="virustotal"
+  $env:VT_API_KEY="your_virustotal_api_key_here"
+  $env:THREAT_INTEL_TIMEOUT_SECONDS="4.0"
+  $env:THREAT_INTEL_WARN_EXTERNAL="true"
+  ```
+  ```bash
+  # Linux / macOS / Bash
+  export THREAT_INTEL_PROVIDER="virustotal"
+  export VT_API_KEY="your_virustotal_api_key_here"
+  export THREAT_INTEL_TIMEOUT_SECONDS=4.0
+  export THREAT_INTEL_WARN_EXTERNAL=true
+  ```
+- **Returning to Mock Mode**:
+  To return to offline mock mode at any time, unset `VT_API_KEY` or set:
+  ```powershell
+  $env:THREAT_INTEL_PROVIDER="mock"
+  ```
+  If `THREAT_INTEL_PROVIDER="virustotal"` is specified without `VT_API_KEY`, the factory automatically falls back to `mock` with a warning log.
 
-```powershell
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/v1/analyses/e4b1bf18-09bc-4340-9a25-e51f28df1d03"
-```
+### 4. Privacy Safeguards & Internal Target Protection
+To strictly prevent leaking internal network topology, credentials, or confidential corporate URLs to external third parties:
+- **Automatic Private / Internal Target Filter**:
+  Before any external request is made, [`is_private_or_internal_indicator`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/virustotal_provider.py#L42) inspects the target:
+  - **Loopback IPs**: `127.0.0.0/8`, `::1`
+  - **RFC 1918 Private IPv4**: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
+  - **RFC 4193 Unique Local IPv6**: `fc00::/7`
+  - **Link-Local Addresses**: `169.254.0.0/16`, `fe80::/10`
+  - **Local Hostnames & Internal TLDs**: `localhost`, `.local`, `.internal`, `.lan`, `.corp`, `.home`, `.test`
+  - **Embedded User Credentials**: URLs containing `username:password@hostname`
+  - When detected, the lookup is **aborted locally** without sending any network traffic. A safe `no_match` response is returned with explicit limitation notes explaining privacy protection.
+- **External Exposure Warning**: If `THREAT_INTEL_WARN_EXTERNAL=True`, a high-visibility warning is logged prior to sending any indicator hash/lookup to VirusTotal.
 
----
+### 5. API Limits, Terms & Privacy Considerations
+- **Tier**: Free / Community VirusTotal API.
+- **Rate Limits**: 4 requests/minute, 500 requests/day.
+- **Rate-Limit Handling**: HTTP `429` responses are caught and wrapped into `ThreatIntelRateLimitError`. The pipeline records this safely in evidence without failing the overall analysis.
+- **Terms of Service**: Non-commercial security evaluation only under free tier.
+- **Privacy Implications**: Any URL queried to VirusTotal may be stored, analyzed, and shared across the global security community. Sensitive, internal, or credentialed URLs must never be transmitted.
 
-## 🔄 Analysis Lifecycle State Machine
-
-```
-              ┌─────────┐
-              │ PENDING │
-              └────┬────┘
-                   │
-           trigger analysis
-                   │
-                   ▼
-              ┌─────────┐
-              │ RUNNING │
-              └────┬────┘
-                   │
-        ┌──────────┴──────────┐
-        │                     │
-     success                error
-        │                     │
-        ▼                     ▼
-  ┌───────────┐         ┌──────────┐
-  │ COMPLETED │         │  FAILED  │
-  └───────────┘         └──────────┘
-```
-
-- Invalid transitions (such as running analysis again on a `completed` or `failed` record) are rejected with HTTP 409 Conflict.
+### 6. Analytical & Safety Rules
+1. **Absence is NOT Innocence**: When a provider returns `no_match`, the score delta is strictly `+0`. The risk score is **never** decreased for an unlisted target.
+2. **Confidence Calibration**: A corroborated match elevates confidence to `medium` (from `low`), reflecting multiple independent evidentiary sources.
+3. **Exploitability Strictly UNKNOWN**: Exploitability remains `unknown` until actively confirmed inside an isolated Digital Twin sandbox.
+4. **Safety Boundaries**: No network packets are ever transmitted to arbitrary user-supplied target indicators. Any remote reputation client connects exclusively to approved, fixed provider endpoints with strict timeout and payload size constraints.
 
 ---
 
@@ -317,15 +348,4 @@ Execute the automated test suite with `pytest`:
 python -m pytest -v
 ```
 
-All 34 automated tests execute in-memory with complete SQLite database isolation.
-
----
-
-## 🛡️ Safety & Ethical Guidelines
-
-VulnTwin AI is developed strictly for defensive security, educational research, and authorized assessment purposes:
-1. **Zero Outbound Network Traffic**: In Milestone 3, all analysis is performed locally on URL strings and hostname syntax. No network packets are sent to target hosts.
-2. **Neutral Observations vs. Security Conclusions**: Syntactic features (such as keyword tokens or IP literals) are recorded as factual evidence signals, not as proof that a host is malicious or vulnerable.
-3. **Exploitability Strictly UNKNOWN**: Passive inspection cannot determine exploitability. Exploitability defaults to `unknown` until verified in an authorized sandbox.
-4. **Collector Fault Tolerance**: Collector failures are contained by `CollectorManager` and recorded as `collection_status: "error"` without halting execution.
-5. **No Dangerous Code Execution**: No exploit payloads, malware samples, or arbitrary scripts are executed.
+All **73 automated tests** execute in-memory with complete SQLite database isolation. External HTTP calls are 100% mocked with `unittest.mock` / `httpx.Response` fixtures, ensuring zero external network traffic or API quota usage during test runs.

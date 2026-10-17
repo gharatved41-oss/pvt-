@@ -10,9 +10,12 @@ from app.models.analysis import AnalysisRecord, AnalysisStatus
 from app.models.evidence import SecurityEvidenceRecord
 from app.schemas.evidence import EvidenceItemCreate
 from app.schemas.risk import RiskAssessmentResponse
+from app.providers import get_threat_intel_provider
+from app.providers.mock_provider import MockThreatIntelProvider
 from app.services.collector import CollectorManager
 from app.services.passive_analyzer import PassiveUrlAnalyzer
 from app.services.risk_engine import DeterministicPassiveRiskEngine
+from app.services.threat_intel_collector import ThreatIntelCollector
 
 logger = logging.getLogger("vulntwin_ai.analysis_service")
 
@@ -171,6 +174,14 @@ def get_evidence_by_analysis_id(
     return list(db.scalars(statement).all())
 
 
+def get_default_collector_manager() -> CollectorManager:
+    """Instantiate default collector manager with passive and threat intel collectors."""
+    manager = CollectorManager()
+    manager.register(PassiveUrlAnalyzer())
+    manager.register(ThreatIntelCollector(get_threat_intel_provider()))
+    return manager
+
+
 def run_passive_analysis(
     db: Session,
     record: AnalysisRecord,
@@ -197,8 +208,7 @@ def run_passive_analysis(
     """
     # Initialize default components if not provided
     if collector_manager is None:
-        collector_manager = CollectorManager()
-        collector_manager.register(PassiveUrlAnalyzer())
+        collector_manager = get_default_collector_manager()
 
     if risk_engine is None:
         risk_engine = DeterministicPassiveRiskEngine()

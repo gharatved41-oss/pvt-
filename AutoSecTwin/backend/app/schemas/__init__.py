@@ -20,6 +20,10 @@ from app.schemas.risk import (
     RiskFactor,
     RiskLevel,
 )
+from app.schemas.threat_intel import (
+    ThreatIntelLookupStatus,
+    ThreatIntelResult,
+)
 
 __all__ = [
     "AnalysisCreateRequest",
@@ -36,4 +40,6 @@ __all__ = [
     "RiskAssessmentResponse",
     "RiskFactor",
     "RiskLevel",
+    "ThreatIntelLookupStatus",
+    "ThreatIntelResult",
 ]
