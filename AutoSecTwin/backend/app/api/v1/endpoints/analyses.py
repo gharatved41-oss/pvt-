@@ -18,6 +18,8 @@ from app.schemas.evidence import (
 from app.services import analysis_service
 from app.services.analysis_service import InvalidStatusTransitionError
 
+from app.services.risk_engine import DeterministicPassiveRiskEngine
+
 router = APIRouter()
 
 
@@ -66,16 +68,16 @@ def list_analyses(
 
 @router.get(
     "/{analysis_id}",
-    response_model=AnalysisResponse,
+    response_model=AnalysisDetailResponse,
     status_code=status.HTTP_200_OK,
     summary="Get Analysis Record by ID",
-    description="Retrieves the details and current status of an individual analysis record by its UUID.",
+    description="Retrieves the details and current status of an individual analysis record by its UUID, including evidence and risk assessment when available.",
     tags=["Analyses"],
 )
 def get_analysis_by_id(
     analysis_id: str,
     db: Session = Depends(get_db),
-) -> AnalysisResponse:
+) -> AnalysisDetailResponse:
     """Retrieve a single analysis record by unique UUID."""
     record = analysis_service.get_analysis_by_id(db=db, analysis_id=analysis_id)
     if not record:
@@ -83,7 +85,23 @@ def get_analysis_by_id(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Analysis record with ID '{analysis_id}' was not found.",
         )
-    return AnalysisResponse.model_validate(record)
+
+    evidence_models = []
+    risk_assessment = None
+    if record.status == "completed":
+        items = analysis_service.get_evidence_by_analysis_id(db=db, analysis_id=analysis_id)
+        evidence_models = [EvidenceItemResponse.model_validate(e) for e in items]
+        risk_assessment = DeterministicPassiveRiskEngine().evaluate(items)
+
+    return AnalysisDetailResponse(
+        id=record.id,
+        url=record.url,
+        status=record.status,
+        created_at=record.created_at,
+        error_message=record.error_message,
+        evidence_items=evidence_models,
+        risk_assessment=risk_assessment,
+    )
 
 
 @router.post(

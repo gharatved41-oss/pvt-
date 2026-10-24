@@ -182,16 +182,32 @@ class DeterministicPassiveRiskEngine:
                                 rationale=f"Threat intelligence returned reputation observation: {item.observed_value}.",
                             )
                         )
-                elif status_val == "no_match" or item.collection_status == EvidenceCollectionStatus.ABSENT:
-                    # Critical safety requirement: No reduction in risk score for no-match!
+                elif (
+                    status_val in ("no_match", "unknown_indicator", "privacy_blocked")
+                    or item.collection_status in (EvidenceCollectionStatus.ABSENT, EvidenceCollectionStatus.SKIPPED)
+                ):
+                    # Critical safety requirement: No reduction in risk score for no-match, unknown, or privacy-blocked!
+                    if status_val == "privacy_blocked" or item.collection_status == EvidenceCollectionStatus.SKIPPED:
+                        rationale = (
+                            "Threat intelligence lookup was skipped locally by privacy guardrails. "
+                            "No external indicator reputation query was performed."
+                        )
+                    elif status_val == "unknown_indicator":
+                        rationale = (
+                            "Target indicator not recorded in threat intelligence provider database (unknown indicator). "
+                            "Absence in database is NOT evidence that the target is safe or benign."
+                        )
+                    else:
+                        rationale = (
+                            "No threat intelligence match recorded in provider database. "
+                            "Absence of threat telemetry is NOT evidence that the target is safe or benign."
+                        )
+
                     factors.append(
                         RiskFactor(
                             signal_name=item.signal_name,
                             score_delta=0,
-                            rationale=(
-                                f"No threat intelligence match recorded in provider database. "
-                                "Absence of threat telemetry is NOT evidence that the target is safe or benign."
-                            ),
+                            rationale=rationale,
                         )
                     )
 

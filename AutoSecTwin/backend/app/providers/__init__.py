@@ -2,6 +2,7 @@
 
 from app.providers.base import (
     BaseThreatIntelProvider,
+    ThreatIntelAuthError,
     ThreatIntelError,
     ThreatIntelInvalidResponseError,
     ThreatIntelRateLimitError,
@@ -17,6 +18,7 @@ from app.providers.virustotal_provider import (
 
 __all__ = [
     "BaseThreatIntelProvider",
+    "ThreatIntelAuthError",
     "ThreatIntelError",
     "ThreatIntelInvalidResponseError",
     "ThreatIntelRateLimitError",

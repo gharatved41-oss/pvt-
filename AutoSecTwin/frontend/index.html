@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VulnTwin AI — Evidence & Reputation Dashboard</title>
+  <meta name="description" content="AI-assisted security intelligence dashboard for passive indicator analysis, multi-source evidence inspection, and explainable risk evaluation.">
+  <link rel="stylesheet" href="/dashboard/style.css">
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>VulnTwin AI</h1>
+          <span class="brand-tag">Evidence &amp; Threat Intelligence Lab</span>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div id="system-health-badge" class="health-badge health-checking" title="System API connectivity">
+          <span class="health-dot"></span>
+          <span id="health-text">Checking API...</span>
+        </div>
+        <a href="/docs" target="_blank" class="nav-link docs-link" title="Open FastAPI Swagger Interactive Documentation">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          API Docs
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="dashboard-main">
+    <!-- Privacy & Threat Intelligence Disclosure Banner -->
+    <section class="notice-banner" id="privacy-disclosure-banner">
+      <div class="notice-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div class="notice-content">
+        <strong>Privacy &amp; Third-Party Intelligence Disclosure:</strong>
+        Submitting public targets for threat intelligence lookup queries external services (such as VirusTotal v3) and will disclose the indicator to third-party security databases.
+        <span>Local privacy guardrails automatically intercept and block RFC 1918 private IPs, loopback addresses, internal TLDs, and embedded user credentials before network transmission.</span>
+      </div>
+    </section>
+
+    <!-- Target Submission Panel -->
+    <section class="card submission-card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2>Submit Target for Passive Reputation Analysis</h2>
+          <p class="card-subtitle">Perform safe, non-intrusive syntax inspection and reputation intelligence query.</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <form id="submission-form" class="submission-form" autocomplete="off">
+          <div class="input-group">
+            <label for="target-url-input" class="sr-only">Target URL</label>
+            <div class="input-wrapper">
+              <span class="input-prefix-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+              </span>
+              <input
+                type="text"
+                id="target-url-input"
+                name="url"
+                placeholder="https://example.com/login or http://target-domain.org:8080/auth"
+                required
+                spellcheck="false"
+              />
+            </div>
+            <button type="submit" id="submit-btn" class="btn btn-primary">
+              <span class="btn-spinner" id="submit-spinner" hidden></span>
+              <span id="submit-btn-text">Submit &amp; Analyze</span>
+            </button>
+          </div>
+          <div id="submission-error" class="form-error-msg" hidden></div>
+        </form>
+
+        <!-- Quick Target Presets -->
+        <div class="presets-container">
+          <span class="presets-label">Quick Test Presets:</span>
+          <div class="presets-list">
+            <button type="button" class="preset-chip" data-url="https://example.com/login" title="Standard public benign URL">Public Benign</button>
+            <button type="button" class="preset-chip" data-url="https://malicious-threat.org/auth/login" title="Simulated confirmed threat match">Threat Match</button>
+            <button type="button" class="preset-chip" data-url="http://127.0.0.1:8000/metrics" title="Loopback address (triggers local privacy block)">Loopback IP</button>
+            <button type="button" class="preset-chip" data-url="https://admin:secret123@auth.internal/portal" title="Embedded credentials & internal domain">Credentials &amp; Internal</button>
+            <button type="button" class="preset-chip" data-url="https://simulate-unknown.org/sample" title="Simulated unknown IOC (HTTP 404 in VT)">Unknown Indicator</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Overview Metrics Grid -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-icon metric-icon-total">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+        </div>
+        <div class="metric-details">
+          <span class="metric-label">Total Analyses</span>
+          <span class="metric-value" id="metric-total">0</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon metric-icon-completed">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        </div>
+        <div class="metric-details">
+          <span class="metric-label">Completed</span>
+          <span class="metric-value" id="metric-completed">0</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon metric-icon-pending">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div class="metric-details">
+          <span class="metric-label">Pending</span>
+          <span class="metric-value" id="metric-pending">0</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon metric-icon-failed">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+        </div>
+        <div class="metric-details">
+          <span class="metric-label">Failed / Error</span>
+          <span class="metric-value" id="metric-failed">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Detail View: Active Analysis Results & Evidence -->
+    <section class="card detail-section" id="active-detail-section" hidden>
+      <div class="card-header detail-header">
+        <div class="detail-header-info">
+          <div class="detail-title-line">
+            <span class="section-tag">Active Analysis</span>
+            <span id="detail-status-badge" class="status-badge status-completed">completed</span>
+          </div>
+          <h3 id="detail-target-url" class="detail-url mono">https://example.com/login</h3>
+          <div class="detail-meta-line">
+            <span>ID: <code id="detail-analysis-id" class="code-id">--</code></span>
+            <span>Created: <time id="detail-timestamp">--</time></span>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <button type="button" id="reanalyze-btn" class="btn btn-secondary btn-sm" title="Re-evaluate passive analysis">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            Re-analyze
+          </button>
+          <button type="button" id="close-detail-btn" class="btn btn-ghost btn-sm" title="Close detail view">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <!-- 3 Core Analytical Invariants Grid: Score, Confidence, Exploitability -->
+        <div class="assessment-triad-grid">
+          <!-- Risk Score Card -->
+          <div class="triad-card risk-score-card">
+            <div class="triad-header">
+              <span class="triad-title">Deterministic Risk Score</span>
+              <span id="detail-risk-level-badge" class="level-badge level-low">LOW</span>
+            </div>
+            <div class="score-display">
+              <div class="score-number-group">
+                <span id="detail-risk-score" class="score-number">10</span>
+                <span class="score-denom">/100</span>
+              </div>
+              <div class="score-meter-track">
+                <div id="detail-score-bar" class="score-meter-fill" style="width: 10%;"></div>
+              </div>
+            </div>
+            <p class="triad-desc">Calculated deterministically from observed syntactic signals and corroborated threat telemetry.</p>
+          </div>
+
+          <!-- Confidence Level Card -->
+          <div class="triad-card confidence-card">
+            <div class="triad-header">
+              <span class="triad-title">Confidence Level</span>
+              <span id="detail-confidence-badge" class="level-badge level-medium">MEDIUM</span>
+            </div>
+            <div class="triad-metric-value" id="detail-confidence-text">Medium Confidence</div>
+            <p class="triad-desc">Calibrated strictly to the breadth and diversity of gathered evidence (low for passive syntax only; medium when threat intelligence corroborates).</p>
+          </div>
+
+          <!-- Exploitability Verification Card -->
+          <div class="triad-card exploitability-card">
+            <div class="triad-header">
+              <span class="triad-title">Exploitability Status</span>
+              <span class="level-badge level-unknown">UNKNOWN</span>
+            </div>
+            <div class="triad-metric-value status-unknown-text">Unknown (Not Verified)</div>
+            <p class="triad-desc">
+              <strong>Crucial Safety Rule:</strong> Reputation lookups and syntax flags do <em>NOT</em> prove actionable exploitability. Exploitability remains Unknown until authorized verification in a containerized Digital Twin lab.
+            </p>
+          </div>
+        </div>
+
+        <!-- Threat Intelligence Outcome Banner -->
+        <div id="threat-intel-outcome-panel" class="outcome-banner outcome-clean">
+          <div class="outcome-icon" id="outcome-icon-container">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+          </div>
+          <div class="outcome-body">
+            <div class="outcome-headline">
+              <span class="outcome-tag" id="outcome-category-tag">Genuine No-Match</span>
+              <span class="outcome-provider" id="outcome-provider-name">Provider: VirusTotal v3</span>
+            </div>
+            <p id="outcome-summary-text" class="outcome-text">
+              No threat entries recorded in the provider database. Crucial safety rule: The absence of a reported threat match does NOT certify the target is safe or benign.
+            </p>
+          </div>
+        </div>
+
+        <!-- Contributing Factors Section -->
+        <div class="factors-section" id="contributing-factors-container">
+          <h4 class="subsection-title">Contributing Risk Factors</h4>
+          <div id="factors-list" class="factors-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Evidence Items Table -->
+        <div class="evidence-section">
+          <div class="evidence-table-header">
+            <h4 class="subsection-title">Gathered Security Evidence (<span id="evidence-count-text">0 items</span>)</h4>
+            <div class="evidence-filter-chips">
+              <button type="button" class="filter-chip active" data-filter="all">All</button>
+              <button type="button" class="filter-chip" data-filter="observed">Observed</button>
+              <button type="button" class="filter-chip" data-filter="absent">Absent</button>
+              <button type="button" class="filter-chip" data-filter="skipped">Skipped (Privacy)</button>
+              <button type="button" class="filter-chip" data-filter="error">Error</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table" id="evidence-table">
+              <thead>
+                <tr>
+                  <th>Signal Name</th>
+                  <th>Observed Value</th>
+                  <th>Source</th>
+                  <th>Status</th>
+                  <th>Observation &amp; Explanatory Notes</th>
+                </tr>
+              </thead>
+              <tbody id="evidence-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Remediation & Hardening Guidance -->
+        <div class="remediation-section">
+          <h4 class="subsection-title">Remediation &amp; Defensive Hardening Guidance</h4>
+          <p class="remediation-subtitle">
+            Actionable guidance based on observed syntactic and reputation evidence. Does not claim a vulnerability is exploitable without authorized Digital Twin verification.
+          </p>
+          <div id="remediation-cards-grid" class="remediation-grid">
+            <!-- Dynamically populated based on observed signals -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recent Analyses Section -->
+    <section class="card history-card">
+      <div class="card-header history-header">
+        <div class="card-title-group">
+          <h2>Analysis History</h2>
+          <p class="card-subtitle">Real-time target submission history and evaluation statuses.</p>
+        </div>
+        <div class="history-controls">
+          <div class="search-box">
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Search by URL or ID..."
+              aria-label="Search analyses"
+            />
+          </div>
+          <select id="status-filter" class="select-filter" aria-label="Filter by status">
+            <option value="all">All Statuses</option>
+            <option value="completed">Completed</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
+          </select>
+          <button type="button" id="refresh-history-btn" class="btn btn-secondary btn-icon" title="Refresh history">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <!-- Loading State -->
+        <div id="history-loading" class="state-container" hidden>
+          <div class="spinner"></div>
+          <p>Loading analysis history from API...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="history-error" class="state-container state-error" hidden>
+          <div class="state-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <p id="history-error-msg">Failed to load analyses from backend API.</p>
+          <button type="button" id="retry-history-btn" class="btn btn-secondary btn-sm">Retry Connection</button>
+        </div>
+
+        <!-- Empty State -->
+        <div id="history-empty" class="state-container state-empty" hidden>
+          <div class="state-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+          </div>
+          <p>No analysis records found. Submit a target URL above to begin.</p>
+        </div>
+
+        <!-- History Table -->
+        <div class="table-responsive" id="history-table-wrapper">
+          <table class="data-table" id="analyses-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Target Indicator</th>
+                <th>Analysis UUID</th>
+                <th>Submitted (UTC)</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="analyses-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <p>VulnTwin AI — Milestone 6: Analysis Results &amp; Evidence Dashboard</p>
+      <p class="footer-disclaimer">
+        Reputation findings do not assert verified exploitability. Digital Twin verification occurs only in isolated environments.
+      </p>
+    </div>
+  </footer>
+
+  <script src="/dashboard/app.js"></script>
+</body>
+</html>

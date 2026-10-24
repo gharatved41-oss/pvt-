@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from app.providers.base import (
     BaseThreatIntelProvider,
+    ThreatIntelAuthError,
     ThreatIntelError,
     ThreatIntelInvalidResponseError,
     ThreatIntelRateLimitError,
@@ -108,12 +109,46 @@ class MockThreatIntelProvider(BaseThreatIntelProvider):
             raise ThreatIntelTimeoutError("Mock provider request exceeded allowed timeout threshold (3000ms).")
         if "simulate-ratelimit" in lower_indicator or "ratelimit.test" in lower_indicator:
             raise ThreatIntelRateLimitError("Mock provider rate limit exceeded (HTTP 429 Too Many Requests).")
+        if "simulate-auth-error" in lower_indicator or "auth.test" in lower_indicator:
+            raise ThreatIntelAuthError("Mock provider authentication failed: invalid or expired credentials.")
         if "simulate-invalid-response" in lower_indicator or "invalid.test" in lower_indicator:
             raise ThreatIntelInvalidResponseError("Mock provider returned malformed response envelope or invalid JSON.")
         if "simulate-unavailable" in lower_indicator or "unavailable.test" in lower_indicator:
             raise ThreatIntelUnavailableError("Mock provider service endpoint is unreachable or degraded (HTTP 503).")
         if "simulate-generic-error" in lower_indicator:
             raise ThreatIntelError("Mock provider encountered an unexpected internal error.")
+
+        if "simulate-privacy-blocked" in lower_indicator:
+            return ThreatIntelResult(
+                provider_name=self.name,
+                indicator=indicator,
+                indicator_type=indicator_type,
+                lookup_status=ThreatIntelLookupStatus.PRIVACY_BLOCKED,
+                threat_verdict=None,
+                threat_score=0,
+                categories=[],
+                raw_data={"privacy_guardrail_applied": True, "reason": "Simulated privacy block"},
+                limitations=[
+                    "Simulated privacy guardrail blocked lookup.",
+                    "A privacy-blocked lookup is NOT a confirmed clean or safe result.",
+                ],
+            )
+
+        if "simulate-unknown" in lower_indicator or "unknown.test" in lower_indicator:
+            return ThreatIntelResult(
+                provider_name=self.name,
+                indicator=indicator,
+                indicator_type=indicator_type,
+                lookup_status=ThreatIntelLookupStatus.UNKNOWN_INDICATOR,
+                threat_verdict=None,
+                threat_score=0,
+                categories=[],
+                raw_data={"status": "indicator_not_found_in_database"},
+                limitations=[
+                    "Indicator not found in mock threat database (unknown indicator).",
+                    "An unknown indicator is NOT proof that the target is safe or benign.",
+                ],
+            )
 
         # 3. Check for matching indicator in simulated database
         domain_key = self.extract_domain(indicator)

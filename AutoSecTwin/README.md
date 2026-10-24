@@ -62,12 +62,16 @@ AutoSecTwin/
 │   └── requirements.txt                        # Core project dependencies
 ├── docs/
 │   └── requirements.md                         # Functional & non-functional requirements
-├── frontend/                                   # Future React/Tailwind frontend
+├── frontend/                                   # Analysis Results & Evidence Dashboard SPA
+│   ├── index.html                              # Semantic HTML5 dashboard layout
+│   ├── style.css                               # Bespoke cybersecurity dark theme styling
+│   └── app.js                                  # Interactive dashboard SPA logic & API client
 ├── digital-twin/                               # Future containerized lab environments
-├── tests/                                      # Automated test suite (73 tests)
+├── tests/                                      # Automated test suite (89 tests)
 │   ├── conftest.py                             # Isolated in-memory DB fixtures & TestClient
 │   ├── test_analyses.py                        # Tests for URL submission, validation & DB isolation
 │   ├── test_api_v1.py                          # Tests for API info and error handling
+│   ├── test_dashboard_frontend.py              # Tests for dashboard HTML, CSS, JS & detail API
 │   ├── test_evidence_collector.py              # Tests for passive analyzer & collector error containment
 │   ├── test_health.py                          # Tests for health check endpoint
 │   ├── test_lifecycle_and_risk.py              # Tests for status transitions, risk engine & evidence endpoints
@@ -304,38 +308,116 @@ Milestone 5 introduces real threat reputation telemetry via the official **Virus
   export THREAT_INTEL_TIMEOUT_SECONDS=4.0
   export THREAT_INTEL_WARN_EXTERNAL=true
   ```
+- **Failing Safely on Missing Key**:
+  When `THREAT_INTEL_PROVIDER="virustotal"` is configured without `VT_API_KEY`, the platform does **not** silently fake a mock result. The provider fails clearly and safely with a structured `ThreatIntelAuthError`, recorded in evidence as `error_auth_error` without crashing the analysis.
 - **Returning to Mock Mode**:
   To return to offline mock mode at any time, unset `VT_API_KEY` or set:
   ```powershell
   $env:THREAT_INTEL_PROVIDER="mock"
   ```
-  If `THREAT_INTEL_PROVIDER="virustotal"` is specified without `VT_API_KEY`, the factory automatically falls back to `mock` with a warning log.
 
-### 4. Privacy Safeguards & Internal Target Protection
-To strictly prevent leaking internal network topology, credentials, or confidential corporate URLs to external third parties:
+### 4. Distinct Lookup Outcomes & Semantics
+The platform preserves and distinguishes seven distinct lookup outcomes:
+1. **Confirmed Match (`match`)**: Multi-vendor security engines flag the indicator as malicious or suspicious. Elevates risk score and confidence.
+2. **Genuine No-Match (`no_match`)**: Target was scanned by multi-vendor engines with zero malicious or suspicious detections (HTTP 200). `score_delta` is strictly `+0`.
+3. **Unknown Indicator (`unknown_indicator`)**: Target has never been submitted or recorded in the provider database (HTTP 404 `NotFoundError`). Documented VirusTotal API semantics are preserved. An unknown indicator is strictly distinct from a clean result; `score_delta` is `+0`.
+4. **Privacy-Blocked (`privacy_blocked`)**: Target contains private IP, loopback, internal hostname, or embedded credentials. Intercepted locally; zero outbound packets are sent. Recorded as `collection_status="skipped"`. **Never reported as a clean result.**
+5. **Authentication Error (`auth_error`)**: Missing or invalid API key (HTTP 401/403). Recorded as collector error evidence item without stopping the pipeline.
+6. **Rate-Limited (`rate_limited`)**: Provider quota exceeded (HTTP 429). Recorded as collector error evidence item.
+7. **Timeout & Provider Outage (`timeout` / `unavailable`)**: Socket timeout or HTTP 5xx service outage. Safely handled without breaking the analysis lifecycle.
+
+### 5. Privacy Safeguards & External Transmission Disclosures
 - **Automatic Private / Internal Target Filter**:
-  Before any external request is made, [`is_private_or_internal_indicator`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/virustotal_provider.py#L42) inspects the target:
-  - **Loopback IPs**: `127.0.0.0/8`, `::1`
+  Before any external request is made, [`is_private_or_internal_indicator`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/virustotal_provider.py#L74) inspects the target:
+  - **Loopback IPs & Localhost**: `127.0.0.0/8`, `::1`, `localhost`, `ip6-localhost`
   - **RFC 1918 Private IPv4**: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
   - **RFC 4193 Unique Local IPv6**: `fc00::/7`
   - **Link-Local Addresses**: `169.254.0.0/16`, `fe80::/10`
-  - **Local Hostnames & Internal TLDs**: `localhost`, `.local`, `.internal`, `.lan`, `.corp`, `.home`, `.test`
+  - **Decimal/Numeric IPv4 Representations**: e.g., `2130706433` (`127.0.0.1`)
+  - **Local Hostnames & Internal TLDs**: `.local`, `.internal`, `.lan`, `.corp`, `.home`, `.test`, `.home.arpa`
   - **Embedded User Credentials**: URLs containing `username:password@hostname`
-  - When detected, the lookup is **aborted locally** without sending any network traffic. A safe `no_match` response is returned with explicit limitation notes explaining privacy protection.
-- **External Exposure Warning**: If `THREAT_INTEL_WARN_EXTERNAL=True`, a high-visibility warning is logged prior to sending any indicator hash/lookup to VirusTotal.
+  - When detected, the lookup is **aborted locally** with zero network traffic.
+- **Redirection Hardening**: HTTP client explicitly sets `follow_redirects=False` to prevent redirect-based request hijacking.
+- **Credential & Secret Redaction in Logs**:
+  All log messages and audit entries sanitize targets using [`sanitize_indicator_for_logging`](file:///c:/Users/prani/.gemini/antigravity-ide/scratch/pvt/AutoSecTwin/backend/app/providers/virustotal_provider.py#L46), redacting passwords (`***:***@...`) so sensitive credentials are never stored in logs or API responses.
+- **Third-Party Disclosure Warning**:
+  Querying external threat intelligence services discloses the submitted indicator to VirusTotal. External lookups should only be performed on public indicators.
 
-### 5. API Limits, Terms & Privacy Considerations
-- **Tier**: Free / Community VirusTotal API.
-- **Rate Limits**: 4 requests/minute, 500 requests/day.
-- **Rate-Limit Handling**: HTTP `429` responses are caught and wrapped into `ThreatIntelRateLimitError`. The pipeline records this safely in evidence without failing the overall analysis.
-- **Terms of Service**: Non-commercial security evaluation only under free tier.
-- **Privacy Implications**: Any URL queried to VirusTotal may be stored, analyzed, and shared across the global security community. Sensitive, internal, or credentialed URLs must never be transmitted.
+### 6. Analytical & Safety Invariants
+1. **Absence is NOT Innocence**: When a provider returns `no_match` or `unknown_indicator`, the score delta is strictly `+0`. The risk score is **never** decreased for an unlisted target.
+2. **Reputation is NOT Proof of Exploitability**: External reputation scores reflect consensus threat telemetry, but do **not** confirm that a target has actionable vulnerabilities or is exploitable. Exploitability remains strictly `unknown` until actively verified inside an isolated Digital Twin sandbox.
+3. **Confidence Calibration**: A corroborated match elevates confidence to `medium` (from `low`), reflecting multiple independent evidentiary sources.
+4. **Reputation Lookup Only**: Zero network packets are ever transmitted to arbitrary user-supplied target indicators.
 
-### 6. Analytical & Safety Rules
-1. **Absence is NOT Innocence**: When a provider returns `no_match`, the score delta is strictly `+0`. The risk score is **never** decreased for an unlisted target.
-2. **Confidence Calibration**: A corroborated match elevates confidence to `medium` (from `low`), reflecting multiple independent evidentiary sources.
-3. **Exploitability Strictly UNKNOWN**: Exploitability remains `unknown` until actively confirmed inside an isolated Digital Twin sandbox.
-4. **Safety Boundaries**: No network packets are ever transmitted to arbitrary user-supplied target indicators. Any remote reputation client connects exclusively to approved, fixed provider endpoints with strict timeout and payload size constraints.
+---
+
+## 🖥️ Evidence & Analysis Dashboard (Milestone 6)
+
+Milestone 6 introduces a responsive, zero-build Single-Page Application (SPA) dashboard located in `frontend/` and served directly by FastAPI at `/dashboard`.
+
+### Features & Capabilities
+1. **Indicator Submission & Workflow**:
+   - Single-click target submission with quick-test presets (Public Benign, Threat Match, Loopback IP, Credentials & Internal, Unknown Indicator).
+   - Prominent **Privacy & Threat Intelligence Disclosure Banner** warning that public queries may disclose indicators to third-party databases.
+   - Real-time lifecycle visualization: auto-submits target (`pending`) and triggers passive analysis pipeline (`running` → `completed`).
+2. **Real-Time Overview Metrics**:
+   - Total Analyses, Completed Analyses, Pending Analyses, and Failed Analyses calculated directly from live API data.
+3. **Core Assessment Triad**:
+   - **Deterministic Risk Score**: Visual gauge (0–100) with categorical level badges (Low, Medium, High, Critical) and transparent point breakdown per contributing factor.
+   - **Confidence Level**: Calibrated to evidence breadth (`low` for syntax only, `medium` for corroborated threat telemetry).
+   - **Exploitability Status**: Fixed at `UNKNOWN` with a prominent safety disclaimer: *Reputation findings do not assert verified exploitability without sandbox testing.*
+4. **Threat Intelligence Outcome Banner**:
+   - Visually differentiates:
+     - 🔴 **Confirmed Threat Match**: Malicious / Suspicious multi-vendor detection.
+     - 🟢 **Genuine No-Match (Clean in DB)**: Zero detections with *absence is not innocence* notice.
+     - ⚪ **Unknown Indicator**: Unrecorded in database (HTTP 404). Strictly not labeled as safe.
+     - 🟣 **Privacy-Blocked Lookup**: Loopbacks, RFC 1918 IPs, internal hostnames, and credentials intercepted locally with `collection_status="skipped"`.
+     - 🟠 **Provider Error / Rate Limited**: Quota or connection issues safely handled.
+5. **Interactive Evidence Table & Filtering**:
+   - Filter evidence observations by status: *All*, *Observed*, *Absent*, *Skipped (Privacy)*, and *Error*.
+   - Displays signal name, observed value, evidence source, and explanatory notes.
+6. **Defensive Remediation Guidance**:
+   - Actionable, practical hardening suggestions based on observed evidence (TLS enforcement, authentication hardening, IOC investigation, perimeter defense) without claiming unverified vulnerabilities.
+7. **Analysis History & Filtering**:
+   - Searchable by target URL or analysis ID.
+   - Filterable by status (All, Completed, Pending, Failed).
+   - Detailed inspection drawer with reload and re-analyze capabilities.
+
+### Accessing the Dashboard
+Start the Uvicorn development server:
+```powershell
+python -m uvicorn --app-dir backend app.main:app --host 127.0.0.1 --port 8000
+```
+Open your browser and navigate to:
+**[http://127.0.0.1:8000/dashboard](http://127.0.0.1:8000/dashboard)**
+
+---
+
+## 🛡️ Operating System Security Assessment API (Milestone 6)
+
+Milestone 6 exposes the read-only, non-destructive OS assessment pipeline via versioned REST API endpoints under `/api/v1/os`.
+
+### Endpoints Overview
+- **Asset Registration & Query**:
+  - `POST /api/v1/os/assets`: Register an assessed OS asset profile (`OSAssetCreateRequest`).
+  - `GET /api/v1/os/assets`: List registered OS asset profiles with pagination (`limit`, `offset`).
+  - `GET /api/v1/os/assets/{asset_id}`: Retrieve a specific OS asset profile by UUID.
+- **Assessment Lifecycle**:
+  - `POST /api/v1/os/assessments`: Create a new assessment session (`pending`). If `asset_id` is omitted, auto-discovers local host.
+  - `GET /api/v1/os/assessments`: List assessment sessions with pagination.
+  - `GET /api/v1/os/assessments/{assessment_id}`: Retrieve detailed assessment state, asset metadata, evidence, and findings.
+  - `POST /api/v1/os/assessments/{assessment_id}/assess`: Execute authorized local read-only assessment (`pending` → `running` → `completed`).
+- **Telemetry, Findings, Risk & Remediation**:
+  - `GET /api/v1/os/assessments/{assessment_id}/evidence`: Retrieve collected security evidence and status counts (`observed`, `absent`, `unavailable`, `error`).
+  - `GET /api/v1/os/assessments/{assessment_id}/findings`: Retrieve security findings and vulnerabilities with authoritative severity and confidence.
+  - `GET /api/v1/os/assessments/{assessment_id}/risk`: Retrieve transparent composite risk scores (0–100), scoring rationale, subscores, and documented assessment limitations.
+  - `GET /api/v1/os/assessments/{assessment_id}/remediation`: Retrieve explainable, recommendation-only remediation plans (`is_applied` is strictly `False`).
+
+### Defensive Guarantees
+- **Strictly Local / Authorized**: Remote targets require explicit authorization; unauthorized modes (`remote_shell`, `active_attack`) are rejected.
+- **Read-Only**: Zero system modifications, patch installations, or service restarts.
+- **Exploitability UNKNOWN**: Exploitability defaults strictly to `unknown` across all schemas.
+- **Uncertainty Over False Clean**: Missing inventories or unavailable feeds trigger uncertainty floors rather than a false clean score.
 
 ---
 
@@ -348,4 +430,4 @@ Execute the automated test suite with `pytest`:
 python -m pytest -v
 ```
 
-All **73 automated tests** execute in-memory with complete SQLite database isolation. External HTTP calls are 100% mocked with `unittest.mock` / `httpx.Response` fixtures, ensuring zero external network traffic or API quota usage during test runs.
+All **249 automated tests** execute in-memory with complete SQLite database isolation. External HTTP calls are 100% mocked with deterministic fixtures, ensuring zero external network traffic or host modifications during test runs.

@@ -2,7 +2,7 @@
 
 Provides structured reputation lookups using documented VirusTotal API v3 endpoints.
 Enforces strict privacy controls: private IP literals, loopback addresses,
-and internal hostnames are rejected locally before network transmission.
+embedded credentials, and internal hostnames are rejected locally before network transmission.
 """
 
 import base64
@@ -16,6 +16,7 @@ import httpx
 from app.core.config import settings
 from app.providers.base import (
     BaseThreatIntelProvider,
+    ThreatIntelAuthError,
     ThreatIntelError,
     ThreatIntelInvalidResponseError,
     ThreatIntelRateLimitError,
@@ -38,7 +39,36 @@ INTERNAL_TLDS = {
     "invalid",
     "localhost",
     "onion",
+    "intranet",
+    "priv",
+    "private",
+    "box",
+    "arpa",
 }
+
+
+def sanitize_indicator_for_logging(indicator: str) -> str:
+    """Redact embedded credentials and sensitive parameters from indicator before logging.
+
+    Prevents exposing sensitive credentials in application or audit logs.
+    """
+    if not indicator:
+        return ""
+    try:
+        if "://" in indicator:
+            parsed = urlparse(indicator)
+            if parsed.username or parsed.password:
+                netloc = parsed.hostname or ""
+                if parsed.port:
+                    netloc = f"{netloc}:{parsed.port}"
+                sanitized_netloc = f"***:***@{netloc}"
+                return parsed._replace(netloc=sanitized_netloc).geturl()
+        elif "@" in indicator:
+            parts = indicator.split("@", 1)
+            return f"***:***@{parts[1]}"
+    except Exception:
+        pass
+    return indicator
 
 
 def is_private_or_internal_indicator(indicator: str) -> Tuple[bool, str]:
@@ -52,36 +82,69 @@ def is_private_or_internal_indicator(indicator: str) -> Tuple[bool, str]:
     Returns:
         Tuple of (is_private: bool, reason: str).
     """
-    if "://" in indicator:
-        parsed = urlparse(indicator)
-        hostname = (parsed.hostname or "").lower()
+    if not indicator or not indicator.strip():
+        return True, "Missing or empty indicator."
+
+    stripped_indicator = indicator.strip()
+
+    # 1. Embedded credentials check
+    if "://" in stripped_indicator:
+        parsed = urlparse(stripped_indicator)
         if parsed.username or parsed.password:
             return True, "Indicator contains embedded user credentials."
+        hostname = (parsed.hostname or "").lower().rstrip(".")
     else:
-        hostname = indicator.split("/")[0].split(":")[0].lower()
+        # Authority check for user:pass@host without scheme
+        authority_part = stripped_indicator.split("/")[0]
+        if "@" in authority_part:
+            return True, "Indicator contains embedded user credentials."
+        hostname = authority_part.split(":")[0].lower().rstrip(".")
 
     if not hostname:
         return True, "Missing or empty hostname."
 
-    # Check loopback named host
-    if hostname == "localhost":
-        return True, "Hostname 'localhost' is a local loopback reference."
+    # Strip IPv6 brackets if present (e.g. [::1] -> ::1)
+    if hostname.startswith("[") and hostname.endswith("]"):
+        hostname = hostname[1:-1]
 
-    # Check IP address literal
+    # 2. Check named loopback references
+    if hostname in ("localhost", "ip6-localhost", "ip6-loopback"):
+        return True, f"Hostname '{hostname}' is a local loopback reference."
+
+    # 3. Check IP address literal
     try:
         ip = ipaddress.ip_address(hostname)
         if ip.is_loopback:
             return True, f"Hostname is a loopback IP address ({hostname})."
-        if ip.is_private:
-            return True, f"Hostname is an RFC 1918/4193 private IP address ({hostname})."
         if ip.is_link_local:
             return True, f"Hostname is a link-local IP address ({hostname})."
+        if ip.is_private:
+            return True, f"Hostname is an RFC 1918/4193 private IP address ({hostname})."
         if ip.is_reserved or ip.is_unspecified:
             return True, f"Hostname is a reserved/unspecified IP address ({hostname})."
+        if ip.is_multicast:
+            return True, f"Hostname is a multicast IP address ({hostname})."
     except ValueError:
         pass
 
-    # Check internal or single-label domain
+    # 4. Check decimal numeric IPv4 integer representations (e.g. 2130706433 -> 127.0.0.1)
+    if hostname.isdigit():
+        try:
+            int_val = int(hostname)
+            if 0 <= int_val <= 0xFFFFFFFF:
+                ip = ipaddress.IPv4Address(int_val)
+                if ip.is_loopback:
+                    return True, f"Hostname is a numeric loopback IP address ({ip})."
+                if ip.is_private:
+                    return True, f"Hostname is a numeric private IP address ({ip})."
+                if ip.is_link_local:
+                    return True, f"Hostname is a numeric link-local IP address ({ip})."
+                if ip.is_reserved or ip.is_unspecified:
+                    return True, f"Hostname is a numeric reserved/unspecified IP address ({ip})."
+        except (ValueError, OverflowError):
+            pass
+
+    # 5. Check internal or single-label domain
     parts = hostname.split(".")
     if len(parts) == 1:
         return True, f"Single-label hostname '{hostname}' is an internal non-routable name."
@@ -89,6 +152,9 @@ def is_private_or_internal_indicator(indicator: str) -> Tuple[bool, str]:
     tld = parts[-1]
     if tld in INTERNAL_TLDS:
         return True, f"Top-level domain '.{tld}' is reserved for private or internal networks."
+
+    if len(parts) >= 2 and f"{parts[-2]}.{parts[-1]}" == "home.arpa":
+        return True, "Domain suffix '.home.arpa' is reserved for residential networks."
 
     return False, ""
 
@@ -129,19 +195,23 @@ class VirusTotalProvider(BaseThreatIntelProvider):
         """Query VirusTotal API v3 for reputation telemetry on the target indicator.
 
         Safety controls:
-          - Validates privacy boundaries first (rejects private IPs and internal domains).
+          - Validates privacy boundaries first (rejects private IPs, loopbacks, internal domains, and credentials).
+          - Does not report privacy-blocked lookups as clean results.
           - Enforces strict request timeouts.
+          - Disables redirect following (follow_redirects=False).
           - Never logs or exposes the API key.
+          - Emits security warning before external network transmission.
         """
         # 1. Privacy Guardrail: Check for internal/private indicators
         is_private, reason = is_private_or_internal_indicator(indicator)
         if is_private:
-            logger.info("Blocked external VirusTotal lookup for private indicator: %s (%s)", indicator, reason)
+            sanitized = sanitize_indicator_for_logging(indicator)
+            logger.info("Blocked external VirusTotal lookup for private indicator: %s (%s)", sanitized, reason)
             return ThreatIntelResult(
                 provider_name=self.name,
                 indicator=indicator,
                 indicator_type=indicator_type,
-                lookup_status=ThreatIntelLookupStatus.NO_MATCH,
+                lookup_status=ThreatIntelLookupStatus.PRIVACY_BLOCKED,
                 threat_verdict=None,
                 threat_score=0,
                 categories=[],
@@ -149,17 +219,28 @@ class VirusTotalProvider(BaseThreatIntelProvider):
                 limitations=[
                     f"External threat intelligence query was blocked by privacy guardrails: {reason}",
                     "No data was transmitted to external third-party services.",
+                    "A privacy-blocked lookup is NOT a confirmed clean or safe result.",
                 ],
             )
 
         # 2. Check API key configuration
         if not self._api_key or self._api_key.strip() == "":
-            raise ThreatIntelUnavailableError(
+            raise ThreatIntelAuthError(
                 "VirusTotal API key is not configured. Set the VT_API_KEY environment variable "
                 "or configure THREAT_INTEL_PROVIDER=mock for offline testing."
             )
 
-        # 3. Construct URL identifier per VT v3 specification
+        # 3. Privacy warning before external indicator transmission
+        if settings.THREAT_INTEL_WARN_EXTERNAL:
+            sanitized = sanitize_indicator_for_logging(indicator)
+            logger.warning(
+                "THREAT INTEL EXTERNAL LOOKUP: Indicator will be transmitted to external provider '%s' (indicator: %s). "
+                "Note: Querying third-party providers discloses the submitted indicator to VirusTotal.",
+                self.name,
+                sanitized,
+            )
+
+        # 4. Construct URL identifier per VT v3 specification
         url_id = compute_virustotal_url_id(indicator)
         endpoint = f"{VIRUSTOTAL_URL_API}/{url_id}"
 
@@ -169,9 +250,9 @@ class VirusTotalProvider(BaseThreatIntelProvider):
             "User-Agent": f"{settings.APP_NAME}-ThreatIntel/1.0",
         }
 
-        # 4. Perform HTTP query with strict timeout
+        # 5. Perform HTTP query with strict timeout and no automatic redirect following
         try:
-            with httpx.Client(timeout=self._timeout) as client:
+            with httpx.Client(timeout=self._timeout, follow_redirects=False) as client:
                 response = client.get(endpoint, headers=headers)
 
         except httpx.TimeoutException as exc:
@@ -183,21 +264,21 @@ class VirusTotalProvider(BaseThreatIntelProvider):
                 f"Network communication error connecting to VirusTotal endpoint: {exc}"
             ) from exc
 
-        # 5. Handle HTTP status codes
+        # 6. Handle HTTP status codes according to VirusTotal v3 API semantics
         if response.status_code == 404:
-            # Indicator has not been scanned or recorded in VirusTotal
+            # Indicator has not been scanned or recorded in VirusTotal database (unknown indicator)
             return ThreatIntelResult(
                 provider_name=self.name,
                 indicator=indicator,
                 indicator_type=indicator_type,
-                lookup_status=ThreatIntelLookupStatus.NO_MATCH,
+                lookup_status=ThreatIntelLookupStatus.UNKNOWN_INDICATOR,
                 threat_verdict=None,
                 threat_score=0,
                 categories=[],
-                raw_data={"http_status": 404, "message": "Indicator not found in VirusTotal database"},
+                raw_data={"http_status": 404, "message": "Indicator not found in VirusTotal database (unknown indicator)"},
                 limitations=[
-                    "Target has not been submitted to or recorded by VirusTotal.",
-                    "Crucial safety rule: A negative (no-match) result is NOT proof that the target is safe or benign.",
+                    "Target indicator has not been submitted to or recorded in VirusTotal (unknown indicator).",
+                    "Crucial safety rule: An unknown (not found) indicator is NOT proof that the target is safe or benign.",
                 ],
             )
 
@@ -208,7 +289,7 @@ class VirusTotalProvider(BaseThreatIntelProvider):
             )
 
         if response.status_code in (401, 403):
-            raise ThreatIntelUnavailableError(
+            raise ThreatIntelAuthError(
                 f"VirusTotal authentication failed (HTTP {response.status_code}). Verify that VT_API_KEY is valid."
             )
 
@@ -222,7 +303,7 @@ class VirusTotalProvider(BaseThreatIntelProvider):
                 f"Unexpected response code from VirusTotal API: HTTP {response.status_code}"
             )
 
-        # 6. Parse and validate JSON response schema
+        # 7. Parse and validate JSON response schema
         try:
             payload = response.json()
             data = payload.get("data")
@@ -235,7 +316,7 @@ class VirusTotalProvider(BaseThreatIntelProvider):
                 f"Malformed or unexpected response envelope from VirusTotal API: {exc}"
             ) from exc
 
-        # 7. Evaluate analysis stats
+        # 8. Evaluate analysis stats
         malicious_count = int(stats.get("malicious", 0))
         suspicious_count = int(stats.get("suspicious", 0))
         harmless_count = int(stats.get("harmless", 0))
@@ -248,7 +329,7 @@ class VirusTotalProvider(BaseThreatIntelProvider):
         # Extract reputation score
         reputation_val = attributes.get("reputation", 0)
 
-        # Determine verdict and calculated score
+        # 9. Determine verdict and calculated score
         if malicious_count > 0:
             verdict = "malicious"
             status = ThreatIntelLookupStatus.MATCH
@@ -278,6 +359,7 @@ class VirusTotalProvider(BaseThreatIntelProvider):
             limitations=[
                 "VirusTotal data represents multi-vendor scanner consensus, not formal proof of exploitability.",
                 "A no-match or zero-detection score does NOT certify that the target is safe.",
+                "Reputation results do not prove whether a vulnerability is exploitable without Digital Twin verification.",
                 "Exploitability remains UNKNOWN pending isolated verification in a Digital Twin sandbox.",
             ],
         )

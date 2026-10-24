@@ -11,6 +11,7 @@ class EvidenceCollectionStatus(str, Enum):
 
     OBSERVED = "observed"
     ABSENT = "absent"
+    SKIPPED = "skipped"
     ERROR = "error"
 
 

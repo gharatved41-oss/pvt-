@@ -1,17 +1,19 @@
-"""FastAPI application entry point for VulnTwin AI backend."""
-
+from contextlib import asynccontextmanager
 import logging
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from contextlib import asynccontextmanager
 from app.api.v1.router import api_v1_router
 from app.core.config import settings
 from app.db.session import init_db
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 
 # Configure logging
 logger = logging.getLogger("vulntwin_ai")
@@ -46,6 +48,17 @@ def create_app() -> FastAPI:
     )
 
     # ---------------------------------------------------------
+    # Cross-Origin Resource Sharing (CORS) Middleware
+    # ---------------------------------------------------------
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # ---------------------------------------------------------
     # Input-independent & structured error handling
     # ---------------------------------------------------------
     @app.exception_handler(StarletteHTTPException)
@@ -66,6 +79,7 @@ def create_app() -> FastAPI:
                 "message": exc.detail,
                 "path": request.url.path,
             },
+            headers=getattr(exc, "headers", None),
         )
 
     @app.exception_handler(RequestValidationError)
@@ -135,7 +149,40 @@ def create_app() -> FastAPI:
             "docs_url": "/docs",
             "api_v1_url": settings.API_V1_STR,
             "health_url": f"{settings.API_V1_STR}/health",
+            "dashboard_url": "/dashboard",
         }
+
+    # ---------------------------------------------------------
+    # Frontend Dashboard UI Routes
+    # ---------------------------------------------------------
+    @app.get(
+        "/dashboard",
+        response_class=HTMLResponse,
+        tags=["Dashboard"],
+        summary="Analysis & Evidence Dashboard UI",
+    )
+    async def dashboard_page() -> HTMLResponse:
+        """Serve the single-page application dashboard HTML."""
+        index_file = FRONTEND_DIR / "index.html"
+        if not index_file.is_file():
+            return HTMLResponse("<h1>Dashboard Not Found</h1>", status_code=404)
+        return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
+
+    @app.get("/dashboard/style.css", include_in_schema=False)
+    async def dashboard_css() -> Response:
+        """Serve dashboard stylesheet."""
+        css_file = FRONTEND_DIR / "style.css"
+        if not css_file.is_file():
+            return Response("/* Not Found */", status_code=404, media_type="text/css")
+        return Response(content=css_file.read_text(encoding="utf-8"), media_type="text/css")
+
+    @app.get("/dashboard/app.js", include_in_schema=False)
+    async def dashboard_js() -> Response:
+        """Serve dashboard JavaScript logic."""
+        js_file = FRONTEND_DIR / "app.js"
+        if not js_file.is_file():
+            return Response("// Not Found", status_code=404, media_type="application/javascript")
+        return Response(content=js_file.read_text(encoding="utf-8"), media_type="application/javascript")
 
     # ---------------------------------------------------------
     # Mount API Routers

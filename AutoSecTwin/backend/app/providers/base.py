@@ -40,6 +40,12 @@ class ThreatIntelUnavailableError(ThreatIntelError):
     pass
 
 
+class ThreatIntelAuthError(ThreatIntelError):
+    """Raised when authentication with the provider fails or API key is missing/invalid."""
+
+    pass
+
+
 class BaseThreatIntelProvider(ABC):
     """Abstract base class for all threat intelligence and reputation providers.
 

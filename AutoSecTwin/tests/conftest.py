@@ -17,6 +17,10 @@ from sqlalchemy.pool import StaticPool
 
 import app.models.analysis  # noqa: F401
 import app.models.evidence  # noqa: F401
+import app.models.os_asset  # noqa: F401
+import app.models.os_assessment  # noqa: F401
+import app.models.os_evidence  # noqa: F401
+import app.models.os_finding  # noqa: F401
 from app.db.session import Base, get_db
 from app.main import create_app
 

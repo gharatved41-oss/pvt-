@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     API_VERSION: str = "v1"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = False
+    ENVIRONMENT: str = "development"  # "development", "test", or "production"
     DATABASE_URL: str = "sqlite:///./vulntwin.db"
 
     # Threat Intelligence Provider Settings

@@ -16,6 +16,9 @@ class ThreatIntelLookupStatus(str, Enum):
 
     MATCH = "match"
     NO_MATCH = "no_match"
+    UNKNOWN_INDICATOR = "unknown_indicator"
+    PRIVACY_BLOCKED = "privacy_blocked"
+    AUTH_ERROR = "auth_error"
     TIMEOUT = "timeout"
     RATE_LIMITED = "rate_limited"
     INVALID_RESPONSE = "invalid_response"

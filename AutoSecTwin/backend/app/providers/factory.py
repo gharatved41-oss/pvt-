@@ -27,10 +27,12 @@ def get_threat_intel_provider(provider_name: Optional[str] = None) -> BaseThreat
         if not settings.VT_API_KEY:
             logger.warning(
                 "THREAT_INTEL_PROVIDER is set to 'virustotal', but VT_API_KEY is not configured. "
-                "Falling back to MockThreatIntelProvider for safe offline execution."
+                "VirusTotal queries will fail safely with an authentication error until VT_API_KEY is set."
             )
-            return MockThreatIntelProvider()
-        return VirusTotalProvider(api_key=settings.VT_API_KEY, timeout=settings.THREAT_INTEL_TIMEOUT_SECONDS)
+        return VirusTotalProvider(
+            api_key=settings.VT_API_KEY,
+            timeout=settings.THREAT_INTEL_TIMEOUT_SECONDS,
+        )
 
     if selected != "mock":
         logger.warning(
