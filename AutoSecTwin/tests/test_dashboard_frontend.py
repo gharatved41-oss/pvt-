@@ -117,3 +117,224 @@ def test_no_api_keys_leaked_in_frontend_assets(client: TestClient) -> None:
         assert "VT_API_KEY" not in content
         assert "x-apikey" not in content
         assert "api_key" not in content.lower() or "api keys exclusively" in content.lower()
+
+
+def test_dashboard_navigation_and_tab_views_served(client: TestClient) -> None:
+    """Verify dashboard HTML includes the primary navigation bar and distinct view containers."""
+    response = client.get("/dashboard")
+    assert response.status_code == 200
+    html = response.text
+
+    # Verify primary navigation tabs
+    assert 'id="tab-nav-dashboard"' in html
+    assert 'id="tab-nav-os-assets"' in html
+    assert 'id="tab-nav-os-assessments"' in html
+    assert 'id="tab-nav-findings"' in html
+    assert 'id="tab-nav-url-analysis"' in html
+    assert 'id="tab-nav-settings"' in html
+
+    # Verify view containers
+    assert 'id="view-dashboard"' in html
+    assert 'id="view-os-assets"' in html
+    assert 'id="view-os-assessments"' in html
+    assert 'id="view-findings"' in html
+    assert 'id="view-url-analysis"' in html
+    assert 'id="view-settings"' in html
+
+    # Verify auth session pill
+    assert 'id="auth-session-pill"' in html
+    assert 'id="auth-current-username"' in html
+    assert 'id="auth-current-role"' in html
+
+
+def test_dashboard_overview_metrics_and_visuals_markup(client: TestClient) -> None:
+    """Verify dashboard overview markup includes asset, assessment, finding metrics and distribution bars."""
+    response = client.get("/dashboard")
+    assert response.status_code == 200
+    html = response.text
+
+    assert 'id="dash-metric-assets"' in html
+    assert 'id="dash-metric-assessments"' in html
+    assert 'id="dash-metric-findings"' in html
+    assert 'id="dash-metric-risk-level"' in html
+    assert 'id="dash-severity-bar"' in html
+    assert 'id="dash-recent-assessments-table"' in html
+
+
+def test_os_asset_management_form_markup(client: TestClient) -> None:
+    """Verify OS asset registration form has all required inputs and error/success containers."""
+    response = client.get("/dashboard")
+    assert response.status_code == 200
+    html = response.text
+
+    assert 'id="register-asset-form"' in html
+    assert 'id="asset-hostname-input"' in html
+    assert 'id="asset-family-select"' in html
+    assert 'id="asset-name-input"' in html
+    assert 'id="asset-version-input"' in html
+    assert 'id="asset-arch-select"' in html
+    assert 'id="btn-submit-asset"' in html
+    assert 'id="os-assets-table"' in html
+
+
+def test_os_assessment_workflow_and_safety_disclaimers(client: TestClient) -> None:
+    """Verify assessment workflow includes read-only safety guarantees and unapplied proposal labels."""
+    response = client.get("/dashboard")
+    assert response.status_code == 200
+    html = response.text
+
+    assert 'id="create-assessment-form"' in html
+    assert 'id="select-assessment-asset"' in html
+    assert 'id="os-assessment-detail-section"' in html
+    assert 'id="os-evidence-table"' in html
+    assert 'id="os-findings-table"' in html
+    assert 'id="os-remediation-cards-grid"' in html
+
+    # Strict invariant & safety disclaimers
+    assert "Read-Only Safety Guarantee" in html
+    assert "ALL RECOMMENDATIONS ARE PROPOSED ACTIONS ONLY" in html
+    assert "tag-unapplied-proposal" in html
+
+
+def test_dashboard_javascript_functions_and_api_integration(client: TestClient) -> None:
+    """Verify app.js includes core functions for auth, tabs, OS assets, assessments, and findings."""
+    response = client.get("/dashboard/app.js")
+    assert response.status_code == 200
+    js = response.text
+
+    # Preserved URL analysis functions
+    assert "handleTargetSubmission" in js
+    assert "renderActiveDetail" in js
+    assert "renderThreatOutcomeBanner" in js
+
+    # New dashboard and OS assessment functions
+    assert "switchTab" in js
+    assert "getAuthHeaders" in js
+    assert "loadDashboardOverview" in js
+    assert "loadOSAssets" in js
+    assert "handleRegisterAsset" in js
+    assert "loadOSAssessments" in js
+    assert "handleCreateAndStartAssessment" in js
+    assert "loadAssessmentDetail" in js
+    assert "renderOSFindings" in js
+    assert "renderOSEvidence" in js
+    assert "renderOSRemediation" in js
+    assert "loadAggregatedFindings" in js
+
+
+def test_dashboard_css_contains_new_components(client: TestClient) -> None:
+    """Verify style.css contains styles for new navigation, auth pill, visuals, and proposal tags."""
+    response = client.get("/dashboard/style.css")
+    assert response.status_code == 200
+    css = response.text
+
+    assert ".main-nav-bar" in css
+    assert ".nav-tab" in css
+    assert ".auth-pill" in css
+    assert ".tag-unapplied-proposal" in css
+    assert ".breakdown-bar" in css
+    assert ".status-running" in css
+    assert ".safety-callout" in css
+
+
+def test_os_asset_and_assessment_api_integration_flow(client: TestClient) -> None:
+    """Verify backend API integration supporting the frontend asset and assessment lifecycle."""
+    headers_a = {"Authorization": "Bearer token_user_a"}
+
+    # 1. Register OS asset via API
+    asset_payload = {
+        "host_identifier": "a" * 64,
+        "hostname": "localhost",
+        "os_family": "linux",
+        "os_name": "Debian GNU/Linux",
+        "os_version": "12",
+        "architecture": "x86_64",
+    }
+    create_asset_res = client.post("/api/v1/os/assets", json=asset_payload, headers=headers_a)
+    assert create_asset_res.status_code == 201
+    asset_id = create_asset_res.json()["id"]
+
+    # 2. List assets for User A
+    list_res = client.get("/api/v1/os/assets", headers=headers_a)
+    assert list_res.status_code == 200
+    assert any(item["id"] == asset_id for item in list_res.json()["items"])
+
+    # 3. Create OS Assessment
+    assess_create_res = client.post(
+        "/api/v1/os/assessments",
+        json={"asset_id": asset_id, "assessment_type": "local_read_only"},
+        headers=headers_a,
+    )
+    assert assess_create_res.status_code == 201
+    assessment_id = assess_create_res.json()["id"]
+    assert assess_create_res.json()["status"] == "pending"
+
+    # 4. Run local read-only assessment
+    run_res = client.post(f"/api/v1/os/assessments/{assessment_id}/assess", headers=headers_a)
+    assert run_res.status_code == 200
+    run_data = run_res.json()
+    assert run_data["status"] == "completed"
+    assert run_data["exploitability_state"] == "unknown"
+
+    # 5. Verify evidence endpoint
+    evid_res = client.get(f"/api/v1/os/assessments/{assessment_id}/evidence", headers=headers_a)
+    assert evid_res.status_code == 200
+    assert "items" in evid_res.json()
+
+    # 6. Verify findings endpoint
+    find_res = client.get(f"/api/v1/os/assessments/{assessment_id}/findings", headers=headers_a)
+    assert find_res.status_code == 200
+    assert "items" in find_res.json()
+
+    # 7. Verify risk score endpoint
+    risk_res = client.get(f"/api/v1/os/assessments/{assessment_id}/risk", headers=headers_a)
+    assert risk_res.status_code == 200
+    assert "risk_score" in risk_res.json()
+
+    # 8. Verify remediation guidance endpoint
+    rem_res = client.get(f"/api/v1/os/assessments/{assessment_id}/remediation", headers=headers_a)
+    assert rem_res.status_code == 200
+    assert "recommendations" in rem_res.json()
+
+
+def test_auth_boundaries_and_ownership_in_api(client: TestClient) -> None:
+    """Verify unauthorized role (guest) gets 403 Forbidden and User B cannot access User A's asset."""
+    headers_a = {"Authorization": "Bearer token_user_a"}
+    headers_b = {"Authorization": "Bearer token_user_b"}
+    headers_guest = {"Authorization": "Bearer token_guest"}
+
+    # Register asset as User A
+    asset_res = client.post(
+        "/api/v1/os/assets",
+        json={
+            "host_identifier": "b" * 64,
+            "hostname": "tenant-iso-node",
+            "os_family": "linux",
+            "os_name": "Ubuntu",
+            "os_version": "22.04",
+            "architecture": "x86_64",
+        },
+        headers=headers_a,
+    )
+    assert asset_res.status_code == 201
+    asset_id = asset_res.json()["id"]
+
+    # Guest user is rejected with 403 Forbidden on asset registration
+    guest_res = client.post(
+        "/api/v1/os/assets",
+        json={
+            "host_identifier": "c" * 64,
+            "hostname": "guest-node",
+            "os_family": "linux",
+            "os_name": "Ubuntu",
+            "os_version": "22.04",
+            "architecture": "x86_64",
+        },
+        headers=headers_guest,
+    )
+    assert guest_res.status_code == 403
+
+    # User B cannot access User A's asset
+    b_res = client.get(f"/api/v1/os/assets/{asset_id}", headers=headers_b)
+    assert b_res.status_code == 403
+

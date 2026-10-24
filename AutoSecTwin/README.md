@@ -351,51 +351,66 @@ The platform preserves and distinguishes seven distinct lookup outcomes:
 
 ---
 
-## 🖥️ Evidence & Analysis Dashboard (Milestone 6)
+## 🖥️ Security Operations & Vulnerability Intelligence Dashboard
 
-Milestone 6 introduces a responsive, zero-build Single-Page Application (SPA) dashboard located in `frontend/` and served directly by FastAPI at `/dashboard`.
+The frontend is a modular, zero-build Single-Page Application (SPA) located in `frontend/` and served directly by FastAPI at `/dashboard`. It unifies URL threat intelligence, OS asset inventory, host vulnerability assessment, and explainable risk evaluation into a cohesive, dark-themed cybersecurity interface.
 
 ### Features & Capabilities
-1. **Indicator Submission & Workflow**:
-   - Single-click target submission with quick-test presets (Public Benign, Threat Match, Loopback IP, Credentials & Internal, Unknown Indicator).
-   - Prominent **Privacy & Threat Intelligence Disclosure Banner** warning that public queries may disclose indicators to third-party databases.
-   - Real-time lifecycle visualization: auto-submits target (`pending`) and triggers passive analysis pipeline (`running` → `completed`).
-2. **Real-Time Overview Metrics**:
-   - Total Analyses, Completed Analyses, Pending Analyses, and Failed Analyses calculated directly from live API data.
-3. **Core Assessment Triad**:
-   - **Deterministic Risk Score**: Visual gauge (0–100) with categorical level badges (Low, Medium, High, Critical) and transparent point breakdown per contributing factor.
-   - **Confidence Level**: Calibrated to evidence breadth (`low` for syntax only, `medium` for corroborated threat telemetry).
-   - **Exploitability Status**: Fixed at `UNKNOWN` with a prominent safety disclaimer: *Reputation findings do not assert verified exploitability without sandbox testing.*
-4. **Threat Intelligence Outcome Banner**:
-   - Visually differentiates:
-     - 🔴 **Confirmed Threat Match**: Malicious / Suspicious multi-vendor detection.
-     - 🟢 **Genuine No-Match (Clean in DB)**: Zero detections with *absence is not innocence* notice.
-     - ⚪ **Unknown Indicator**: Unrecorded in database (HTTP 404). Strictly not labeled as safe.
-     - 🟣 **Privacy-Blocked Lookup**: Loopbacks, RFC 1918 IPs, internal hostnames, and credentials intercepted locally with `collection_status="skipped"`.
-     - 🟠 **Provider Error / Rate Limited**: Quota or connection issues safely handled.
-5. **Interactive Evidence Table & Filtering**:
-   - Filter evidence observations by status: *All*, *Observed*, *Absent*, *Skipped (Privacy)*, and *Error*.
-   - Displays signal name, observed value, evidence source, and explanatory notes.
-6. **Defensive Remediation Guidance**:
-   - Actionable, practical hardening suggestions based on observed evidence (TLS enforcement, authentication hardening, IOC investigation, perimeter defense) without claiming unverified vulnerabilities.
-7. **Analysis History & Filtering**:
-   - Searchable by target URL or analysis ID.
-   - Filterable by status (All, Completed, Pending, Failed).
-   - Detailed inspection drawer with reload and re-analyze capabilities.
+
+1. **Top-Level Navigation & View Routing**:
+   - **Dashboard Overview**: Executive security metrics, severity breakdown bar, assessment status distribution, and recent assessment history.
+   - **OS Assets**: Register supported local host platforms, view hardware architecture, and track host inventory.
+   - **OS Assessments**: Initialize and execute read-only host configuration audits and CVE matching workflows.
+   - **Findings Explorer**: Cross-host vulnerability explorer with live search and severity filtering (Critical, High, Medium, Low, Unrated).
+   - **URL Analysis**: Preserved passive URL syntax inspection, VirusTotal threat telemetry, and evidence observation.
+   - **Auth & Settings**: Switch assessor credentials and test multi-tenant authorization boundaries.
+
+2. **Dashboard Overview Visualizations**:
+   - Real-time overview metric cards: Registered OS Assets, Completed Assessments, Unresolved Findings, and Latest Host Risk Level.
+   - **Finding Severity Breakdown**: Visual multi-segment bar displaying real distribution of identified CVEs and misconfigurations.
+   - **Assessment Status Distribution**: Breakdown of sessions across `completed`, `running`, `pending`, and `failed` states.
+   - **Recent Assessments Table**: Ordered by creation timestamp with direct "Inspect" action links.
+
+3. **OS Asset Inventory Management**:
+   - **Supported Platform Registration**: Form to record local hosts with hostname, OS family (`linux`, `windows`), distribution name, version, and architecture (`x86_64`, `aarch64`, etc.).
+   - **Input Validation**: Rejection of unsupported operating system families and clear UI error reporting.
+   - **Ownership Isolation**: Assets are retrieved strictly according to the authenticated tenant identity.
+
+4. **OS Assessment Workflow & Safety Guarantees**:
+   - **Authorized Assessment Trigger**: Select an asset and launch a local assessment session.
+   - **Read-Only Safety Guarantee**: Non-intrusive evidence collection via passive probes and authoritative vendor advisory matching. No exploits are executed, no shell payloads are run, and no host configuration files are altered.
+   - **Analytical Invariants Triad**:
+     - **Deterministic Risk Score**: Transparent composite score (0–100) and categorical risk level (Low, Medium, High, Critical).
+     - **Confidence Calibration**: Derived strictly from evidence breadth and advisory match certainty.
+     - **Exploitability Strictly UNKNOWN**: Exploitability defaults to `unknown` with a clear explanation that CVE matches do not prove actionable exploitability without authorized Digital Twin verification.
+   - **Remediation as Proposed Guidance**: Hardening recommendations are explicitly tagged with `PROPOSED ACTION (NOT APPLIED)` to prevent any misconception that fixes have been applied to the target host.
+   - **Distinction of Vendor Fix vs. Host State**: Clear differentiation between a vendor fixed version being available in repositories versus a fix being installed and verified on the host.
+
+5. **Authentication & Multi-Tenant Authorization**:
+   - **Session Switcher Pill**: Quick profile selector in the navigation header displaying the active user and role.
+   - **Built-In Developer Profiles**:
+     - *Security Analyst A* (`token_user_a`): Assessor with standard access to owned assets.
+     - *Security Analyst B* (`token_user_b`): Different tenant used to verify 403 Forbidden cross-tenant isolation.
+     - *SecOps Administrator* (`admin_token`): Administrative bypass across all tenant assets.
+     - *Guest Auditor* (`guest_token`): Read-only guest rejected with 403 Forbidden on assessment execution.
+     - *Custom Bearer Token*: Field for arbitrary Bearer credentials.
+   - **Server-Side Enforcement**: All authorization boundaries are enforced server-side; client UI respects 401 Unauthorized and 403 Forbidden challenges.
 
 ### Accessing the Dashboard
+
 Start the Uvicorn development server:
 ```powershell
-python -m uvicorn --app-dir backend app.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn --app-dir backend app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+
 Open your browser and navigate to:
 **[http://127.0.0.1:8000/dashboard](http://127.0.0.1:8000/dashboard)**
 
 ---
 
-## 🛡️ Operating System Security Assessment API (Milestone 6)
+## 🛡️ Operating System Security Assessment API
 
-Milestone 6 exposes the read-only, non-destructive OS assessment pipeline via versioned REST API endpoints under `/api/v1/os`.
+The read-only, non-destructive OS assessment pipeline is exposed via versioned REST API endpoints under `/api/v1/os`.
 
 ### Endpoints Overview
 - **Asset Registration & Query**:
@@ -430,4 +445,5 @@ Execute the automated test suite with `pytest`:
 python -m pytest -v
 ```
 
-All **249 automated tests** execute in-memory with complete SQLite database isolation. External HTTP calls are 100% mocked with deterministic fixtures, ensuring zero external network traffic or host modifications during test runs.
+All **269 automated tests** execute in-memory with complete SQLite database isolation. External HTTP calls are 100% mocked with deterministic fixtures, ensuring zero external network traffic or host modifications during test runs.
+
