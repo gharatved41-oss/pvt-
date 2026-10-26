@@ -1,0 +1,66 @@
+{
+  "hostname": "prod-web-gateway-01",
+  "ip_address": "10.0.4.15",
+  "os_type": "linux",
+  "os_version": "Ubuntu 22.04.2 LTS",
+  "environment": "production",
+  "criticality": "critical",
+  "configuration_metadata": {
+    "kernel": "5.15.0-76-generic",
+    "open_ports": [22, 80, 443, 8080],
+    "firewall_active": true,
+    "selinux_enforcing": false,
+    "ssh_root_login": "prohibit-password"
+  },
+  "packages": [
+    {
+      "name": "policykit-1",
+      "version": "0.105-26ubuntu0.1",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "userspace authorization toolkit"
+    },
+    {
+      "name": "openssh-server",
+      "version": "1:8.9p1-3ubuntu0.1",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "secure shell (SSH) server"
+    },
+    {
+      "name": "nginx",
+      "version": "1.24.0-1ubuntu1",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "high performance web server and reverse proxy"
+    },
+    {
+      "name": "curl",
+      "version": "7.81.0-1ubuntu1.13",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "command line tool for transferring data with URL syntax"
+    },
+    {
+      "name": "log4j-core",
+      "version": "2.14.1",
+      "architecture": "all",
+      "status": "installed",
+      "description": "Apache Log4j Core implementation"
+    },
+    {
+      "name": "systemd",
+      "version": "249.11-0ubuntu3.9",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "system and service manager"
+    },
+    {
+      "name": "sudo",
+      "version": "1.9.9-1ubuntu2.4",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "Provide limited super user privileges to specific users"
+    }
+  ]
+}

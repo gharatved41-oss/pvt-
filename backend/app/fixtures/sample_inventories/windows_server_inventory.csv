@@ -1,0 +1,5 @@
+package_name,version,architecture,status,description
+windows-clfs,10.0.20348.1607,x64,installed,Common Log File System driver
+curl,8.1.2,x64,installed,curl binary for Windows
+log4j-core,2.14.0,all,installed,Enterprise Logging Module
+powershell,7.3.4,x64,installed,PowerShell Core runtime

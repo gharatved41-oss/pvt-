@@ -1,0 +1,7 @@
+package_name,version,architecture,status,description
+policykit-1,0.105-26ubuntu0.1,amd64,installed,userspace authorization toolkit
+openssh-server,1:8.9p1-3ubuntu0.1,amd64,installed,secure shell server
+nginx,1.24.0,amd64,installed,high performance web server
+curl,7.81.0,amd64,installed,command line tool for transferring data
+log4j-core,2.14.1,all,installed,Apache Log4j Core implementation
+systemd,249.11,amd64,installed,system and service manager

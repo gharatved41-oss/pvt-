@@ -1,0 +1,261 @@
+[
+  {
+    "cve_id": "CVE-2021-4034",
+    "title": "Polkit pkexec Local Privilege Escalation (PwnKit)",
+    "component": "policykit-1",
+    "affected_platforms": ["linux"],
+    "min_version": "0.105-0",
+    "max_version": "0.105-31",
+    "fixed_version": "0.105-31.1",
+    "cvss_v3_score": 7.8,
+    "cvss_v3_vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+    "severity": "high",
+    "exploit_available": true,
+    "exploit_maturity": "high",
+    "description": "A local privilege escalation vulnerability was discovered in Polkit's pkexec command-line tool. The pkexec program is installed setuid root and can be abused by an unprivileged local user to obtain full root privileges.",
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2021-4034",
+      "https://www.qualys.com/2022/01/25/cve-2021-4034/pwnkit.txt"
+    ],
+    "remediation": {
+      "action_type": "package_update",
+      "title": "Upgrade policykit-1 package to patched release",
+      "description": "Install vendor security update for policykit-1 / polkit package, or remove SUID bit from pkexec if patching is temporarily unfeasible.",
+      "vendor_advisory_url": "https://ubuntu.com/security/notices/USN-5252-1",
+      "prerequisites": ["Root privileges in twin environment", "Access to package repository mirror"],
+      "command_preview": "sudo apt-get update && sudo apt-get --only-upgrade install -y policykit-1",
+      "rollback_instructions": "sudo apt-get install policykit-1=0.105-26ubuntu0.1",
+      "expected_outcome": "policykit-1 upgraded to >= 0.105-31.1; pkexec parameter parsing vulnerability mitigated."
+    },
+    "validation_procedure": {
+      "procedure_code": "PROC-SEC-PKEXEC-01",
+      "name": "Pkexec Environment Argument Inspection Procedure",
+      "safety_level": "safe_non_destructive",
+      "preconditions": "Twin environment running isolated Linux lab with pkexec binary present.",
+      "description": "Performs safe command-line environment interrogation testing whether pkexec handles argc==0 without reading unauthorized environment parameters.",
+      "test_logic_type": "binary_flag_and_suid_check"
+    }
+  },
+  {
+    "cve_id": "CVE-2023-38408",
+    "title": "OpenSSH PKCS#11 Provider Arbitrary Library Loading in ssh-agent",
+    "component": "openssh-server",
+    "affected_platforms": ["linux"],
+    "min_version": "5.5p1",
+    "max_version": "9.3p1",
+    "fixed_version": "9.3p2",
+    "cvss_v3_score": 9.8,
+    "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+    "severity": "critical",
+    "exploit_available": true,
+    "exploit_maturity": "high",
+    "description": "A condition in ssh-agent allows an attacker with access to the agent socket to load arbitrary shared libraries via PKCS#11 provider paths under certain conditions.",
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2023-38408",
+      "https://www.openssh.com/txt/release-9.3p2"
+    ],
+    "remediation": {
+      "action_type": "package_update",
+      "title": "Update openssh-server and openssh-client to 9.3p2 or later",
+      "description": "Apply vendor security update to replace ssh-agent with patched library validation checks.",
+      "vendor_advisory_url": "https://ubuntu.com/security/CVE-2023-38408",
+      "prerequisites": ["Active SSH session kept alive", "Lab network bridge operational"],
+      "command_preview": "sudo apt-get update && sudo apt-get --only-upgrade install -y openssh-server openssh-client",
+      "rollback_instructions": "sudo apt-get install openssh-server=1:8.9p1-3ubuntu0.1",
+      "expected_outcome": "openssh-server upgraded to patched version; ssh-agent ignores non-whitelisted PKCS#11 shared objects."
+    },
+    "validation_procedure": {
+      "procedure_code": "PROC-SEC-SSH-AGENT-02",
+      "name": "SSH Agent PKCS11 Whitelist Configuration Query",
+      "safety_level": "safe_non_destructive",
+      "preconditions": "Isolated Twin with openssh-server active on port 22.",
+      "description": "Queries ssh-agent protocol handshake version and checks if pkcs11 provider library filtering is active.",
+      "test_logic_type": "banner_and_socket_protocol_probe"
+    }
+  },
+  {
+    "cve_id": "CVE-2021-44228",
+    "title": "Apache Log4j2 JNDI Remote Code Execution (Log4Shell)",
+    "component": "log4j-core",
+    "affected_platforms": ["linux", "windows"],
+    "min_version": "2.0.0",
+    "max_version": "2.14.1",
+    "fixed_version": "2.17.1",
+    "cvss_v3_score": 10.0,
+    "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+    "severity": "critical",
+    "exploit_available": true,
+    "exploit_maturity": "critical",
+    "description": "Apache Log4j2 JNDI features used in configuration, log messages, and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints, allowing remote code execution.",
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2021-44228",
+      "https://logging.apache.org/log4j/2.x/security.html"
+    ],
+    "remediation": {
+      "action_type": "package_update",
+      "title": "Upgrade Log4j to 2.17.1 or higher and disable JNDI lookup",
+      "description": "Replace vulnerable JAR archives with 2.17.1+ or configure -Dlog4j2.formatMsgNoLookups=true system property.",
+      "vendor_advisory_url": "https://logging.apache.org/log4j/2.x/security.html",
+      "prerequisites": ["Service stop/restart in digital twin", "JAR checksum verification"],
+      "command_preview": "mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.17.1 || cp log4j-core-2.17.1.jar /opt/app/lib/",
+      "rollback_instructions": "cp /opt/app/lib/backup/log4j-core-2.14.1.jar /opt/app/lib/",
+      "expected_outcome": "log4j-core upgraded to 2.17.1; JNDI lookups completely disabled by default."
+    },
+    "validation_procedure": {
+      "procedure_code": "PROC-SEC-LOG4J-03",
+      "name": "Non-Destructive Local JNDI Lookup Header Diagnostic",
+      "safety_level": "safe_non_destructive",
+      "preconditions": "Digital Twin running target Java service with loopback logging enabled.",
+      "description": "Sends safe diagnostic ping with localized canary format string to isolated twin loopback listener; checks if JndiLookup class is resolved.",
+      "test_logic_type": "canary_lookup_probe"
+    }
+  },
+  {
+    "cve_id": "CVE-2023-44487",
+    "title": "HTTP/2 Rapid Reset Denial of Service Vulnerability",
+    "component": "nginx",
+    "affected_platforms": ["linux"],
+    "min_version": "1.20.0",
+    "max_version": "1.25.2",
+    "fixed_version": "1.25.3",
+    "cvss_v3_score": 7.5,
+    "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+    "severity": "high",
+    "exploit_available": true,
+    "exploit_maturity": "high",
+    "description": "The HTTP/2 protocol allows a client to request stream cancellation by sending an RST_STREAM frame. When abused in rapid bursts, this induces heavy CPU load on server processing queues.",
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2023-44487",
+      "https://www.nginx.com/blog/http-2-rapid-reset-attack-impacting-f5-nginx-products/"
+    ],
+    "remediation": {
+      "action_type": "config_hardening",
+      "title": "Enforce keepalive_time, keepalive_requests and limit_req directives in NGINX",
+      "description": "Update nginx configuration to restrict maximum concurrent streams and throttle rapid RST_STREAM bursts, or update nginx to 1.25.3+.",
+      "vendor_advisory_url": "https://nginx.org/en/security_advisories.html",
+      "prerequisites": ["Syntax validation via nginx -t"],
+      "command_preview": "sudo sed -i '/http {/a \\    limit_req_zone $binary_remote_addr zone=req_limit_per_ip:10m rate=50r/s;\\n    keepalive_requests 1000;' /etc/nginx/nginx.conf && sudo nginx -s reload",
+      "rollback_instructions": "sudo cp /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf && sudo nginx -s reload",
+      "expected_outcome": "HTTP/2 stream resets throttled to safe rate limits."
+    },
+    "validation_procedure": {
+      "procedure_code": "PROC-SEC-HTTP2-04",
+      "name": "HTTP/2 Safe Multiplexing & Reset Diagnostic Check",
+      "safety_level": "safe_non_destructive",
+      "preconditions": "Twin web service reachable over isolated lab IP on port 443.",
+      "description": "Performs single TLS ALPN HTTP/2 negotiation and verifies stream limit headers and server keepalive thresholds without flooding.",
+      "test_logic_type": "http2_settings_frame_audit"
+    }
+  },
+  {
+    "cve_id": "CVE-2023-38606",
+    "title": "curl SOCKS5 Heap Buffer Overflow",
+    "component": "curl",
+    "affected_platforms": ["linux", "windows"],
+    "min_version": "7.69.0",
+    "max_version": "8.3.0",
+    "fixed_version": "8.4.0",
+    "cvss_v3_score": 9.8,
+    "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+    "severity": "critical",
+    "exploit_available": true,
+    "exploit_maturity": "medium",
+    "description": "curl contains a heap buffer overflow vulnerability in the SOCKS5 hostname handshake when hostnames longer than 255 bytes are handed to the SOCKS5 proxy protocol handler.",
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2023-38606",
+      "https://curl.se/docs/CVE-2023-38545.html"
+    ],
+    "remediation": {
+      "action_type": "package_update",
+      "title": "Upgrade libcurl and curl to version 8.4.0 or later",
+      "description": "Install vendor patched curl library packages to prevent heap buffer overwrite.",
+      "vendor_advisory_url": "https://curl.se/docs/CVE-2023-38545.html",
+      "prerequisites": ["Root privileges in twin environment"],
+      "command_preview": "sudo apt-get update && sudo apt-get --only-upgrade install -y curl libcurl4",
+      "rollback_instructions": "sudo apt-get install curl=7.81.0-1ubuntu1.13 libcurl4=7.81.0-1ubuntu1.13",
+      "expected_outcome": "curl and libcurl4 updated to >= 8.4.0; SOCKS5 hostname bounds checking enforced."
+    },
+    "validation_procedure": {
+      "procedure_code": "PROC-SEC-CURL-05",
+      "name": "Safe Hostname Parsing Static Library Symbols Verification",
+      "safety_level": "safe_non_destructive",
+      "preconditions": "Twin terminal available with read access to libcurl.so",
+      "description": "Inspects libcurl ELF header symbols and verifies patch commit signature presence in socks5_negotiate function.",
+      "test_logic_type": "binary_symbol_and_header_check"
+    }
+  },
+  {
+    "cve_id": "CVE-2023-28252",
+    "title": "Windows Common Log File System (CLFS) Driver Elevation of Privilege",
+    "component": "windows-clfs",
+    "affected_platforms": ["windows"],
+    "min_version": "10.0.19041",
+    "max_version": "10.0.20348.1607",
+    "fixed_version": "10.0.20348.1668 (KB5025239)",
+    "cvss_v3_score": 7.8,
+    "cvss_v3_vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+    "severity": "high",
+    "exploit_available": true,
+    "exploit_maturity": "high",
+    "description": "An elevation of privilege vulnerability exists in the Windows Common Log File System (CLFS) Driver (clfs.sys) allowing an attacker who successfully exploited this vulnerability to gain SYSTEM privileges.",
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2023-28252",
+      "https://msrc.microsoft.com/update-guide/vulnerability/CVE-2023-28252"
+    ],
+    "remediation": {
+      "action_type": "package_update",
+      "title": "Apply Microsoft Security Update KB5025239 (clfs.sys patch)",
+      "description": "Install April 2023 Cumulative Update or later on the Windows host.",
+      "vendor_advisory_url": "https://support.microsoft.com/en-us/help/5025239",
+      "prerequisites": ["Administrator privileges in twin environment", "Reboot cycle permitted"],
+      "command_preview": "Install-WindowsUpdate -KBArticleID KB5025239 -AcceptAll -IgnoreReboot",
+      "rollback_instructions": "wusa.exe /uninstall /kb:5025239 /quiet",
+      "expected_outcome": "clfs.sys driver version incremented to patched release."
+    },
+    "validation_procedure": {
+      "procedure_code": "PROC-SEC-WIN-CLFS-06",
+      "name": "Windows CLFS Driver Driver File Version and Patch Audit",
+      "safety_level": "safe_non_destructive",
+      "preconditions": "Windows Twin VM online with PowerShell management endpoint.",
+      "description": "Inspects file metadata of C:\\Windows\\System32\\drivers\\clfs.sys and checks QFE patch registry keys without invoking exploit trigger.",
+      "test_logic_type": "file_version_registry_inspection"
+    }
+  },
+  {
+    "cve_id": "CVE-2024-3094",
+    "title": "XZ Utils Embedded Malicious Backdoor in Upstream Release Tarballs",
+    "component": "xz-utils",
+    "affected_platforms": ["linux"],
+    "min_version": "5.6.0",
+    "max_version": "5.6.1",
+    "fixed_version": "5.4.5-0.3",
+    "cvss_v3_score": 10.0,
+    "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+    "severity": "critical",
+    "exploit_available": true,
+    "exploit_maturity": "high",
+    "description": "Malicious code was discovered in the upstream tarballs of xz-utils starting with version 5.6.0. Through a series of complex M4 macros, the build process extracts a prebuilt object file that intercepts OpenSSH authentication via liblzma.",
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2024-3094",
+      "https://www.cisa.gov/news-events/alerts/2024/03/29/reported-supply-chain-compromise-affecting-xz-utils-data-compression-library-cve-2024-3094"
+    ],
+    "remediation": {
+      "action_type": "package_update",
+      "title": "Downgrade or replace xz-utils with verified safe 5.4.x release",
+      "description": "Immediately downgrade xz-utils to known-clean stable release 5.4.5 or 5.4.6.",
+      "vendor_advisory_url": "https://ubuntu.com/security/CVE-2024-3094",
+      "prerequisites": ["Root privileges in twin environment"],
+      "command_preview": "sudo apt-get install --allow-downgrades -y xz-utils=5.4.5* liblzma5=5.4.5*",
+      "rollback_instructions": "sudo apt-get install xz-utils=5.6.1*",
+      "expected_outcome": "liblzma5 downgraded to clean version; symbol redirection hook eliminated."
+    },
+    "validation_procedure": {
+      "procedure_code": "PROC-SEC-XZ-07",
+      "name": "liblzma Shared Object Disassembly and Symbol Signature Check",
+      "safety_level": "safe_non_destructive",
+      "preconditions": "Twin Linux instance with liblzma5 installed.",
+      "description": "Scans liblzma.so.5 GOT table and checksums signature against known compromised binary hashes; does not trigger ssh hook.",
+      "test_logic_type": "binary_checksum_and_symbol_audit"
+    }
+  }
+]

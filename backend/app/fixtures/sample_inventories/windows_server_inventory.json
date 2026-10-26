@@ -1,0 +1,45 @@
+{
+  "hostname": "win-ad-dc-01",
+  "ip_address": "10.0.8.20",
+  "os_type": "windows",
+  "os_version": "Windows Server 2022 Datacenter (Build 20348.1607)",
+  "environment": "staging",
+  "criticality": "critical",
+  "configuration_metadata": {
+    "domain": "CORP.LOCAL",
+    "open_ports": [88, 135, 389, 445, 3389],
+    "smbv1_enabled": false,
+    "uac_enabled": true,
+    "windows_defender_running": true
+  },
+  "packages": [
+    {
+      "name": "windows-clfs",
+      "version": "10.0.20348.1607",
+      "architecture": "x64",
+      "status": "installed",
+      "description": "Common Log File System driver"
+    },
+    {
+      "name": "curl",
+      "version": "8.1.2",
+      "architecture": "x64",
+      "status": "installed",
+      "description": "curl command line tool for Windows"
+    },
+    {
+      "name": "log4j-core",
+      "version": "2.14.0",
+      "architecture": "all",
+      "status": "installed",
+      "description": "Enterprise App Logging Component"
+    },
+    {
+      "name": "powershell",
+      "version": "7.3.4",
+      "architecture": "x64",
+      "status": "installed",
+      "description": "PowerShell Core runtime"
+    }
+  ]
+}
