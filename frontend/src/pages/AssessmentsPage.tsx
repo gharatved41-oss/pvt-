@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Activity, PlayCircle, RefreshCw, FileText, ArrowRight,
-  ShieldAlert, CheckCircle2, AlertTriangle, X
+  ShieldAlert, CheckCircle2, AlertTriangle, X, Download
 } from 'lucide-react';
 import { api } from '../services/api';
 import { Assessment, Asset } from '../types';
@@ -169,9 +169,16 @@ export const AssessmentsPage: React.FC = () => {
                         <button
                           onClick={() => api.downloadPdfReport(ass.id)}
                           className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-400 border border-slate-700 transition-colors inline-flex items-center"
-                          title="Download PDF Report"
+                          title="Download PDF Security Report"
                         >
                           <FileText className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => api.downloadCsvReport(ass.id)}
+                          className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-emerald-400 border border-slate-700 transition-colors inline-flex items-center"
+                          title="Download CSV Assessment Report"
+                        >
+                          <Download className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     </tr>

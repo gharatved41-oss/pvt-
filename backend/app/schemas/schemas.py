@@ -177,11 +177,25 @@ class DigitalTwinResponse(BaseModel):
     target_config: Dict[str, Any]
     current_config: Dict[str, Any]
     config_parity_score: float
+    is_simulation: Optional[bool] = True
+    provider_label: Optional[str] = "Simulated Sandbox (MockIsolated)"
+    simulation_notice: Optional[str] = "Running in deterministic isolated sandbox simulation. Production safe - no live hypervisor changes."
     created_at: datetime
     updated_at: datetime
 
 class TwinActionRequest(BaseModel):
     action: str = Field(..., pattern="^(reset_snapshot|create_snapshot|start|stop|sync_config|verify_isolation)$")
+    snapshot_name: Optional[str] = "baseline"
+
+class ConfigComparisonResponse(BaseModel):
+    twin_id: str
+    asset_id: str
+    config_parity_score: float
+    matched_parameters: Dict[str, Any]
+    differing_parameters: Dict[str, Dict[str, Any]]
+    missing_in_twin: List[str]
+    missing_in_target: List[str]
+    summary: str
 
 # --- Validation Schemas ---
 class ValidationProcedureResponse(BaseModel):
@@ -222,6 +236,17 @@ class RemediationApprovalCreate(BaseModel):
     status: str = Field(..., pattern="^(approved|rejected)$")
     justification: str
 
+class RemediationApprovalResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    recommendation_id: str
+    user_id: str
+    status: str
+    justification: str
+    target_environment: str
+    approved_at: datetime
+    user_email: Optional[str] = None
+
 class RemediationRecommendationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -247,6 +272,7 @@ class RemediationApplyRequest(BaseModel):
 class RetestRequest(BaseModel):
     finding_id: str
     twin_id: str
+    procedure_code: Optional[str] = None
 
 class RetestResultResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

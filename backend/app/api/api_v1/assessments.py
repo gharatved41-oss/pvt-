@@ -12,7 +12,7 @@ from ...schemas.schemas import AssessmentCreate, AssessmentResponse
 from ...services.cve_service import cve_service
 from ...services.ml_risk_engine import ml_risk_engine
 from ...services.audit_service import audit_service
-from ..deps import get_current_user
+from ..deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 
@@ -194,3 +194,104 @@ def get_assessment(
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment not found")
     return assessment
+
+@router.delete("/{assessment_id}")
+def delete_assessment(
+    assessment_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Delete an assessment run and related findings (admin only)."""
+    assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+
+    title = assessment.title
+    asset_id = assessment.asset_id
+    db.delete(assessment)
+    db.commit()
+
+    audit_service.log_event(
+        db=db,
+        event_type="assessment",
+        action="assessment_deleted",
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"assessment_id": assessment_id, "title": title, "asset_id": asset_id}
+    )
+    return {"message": "Assessment deleted successfully"}
+
+@router.get("/{assessment_id}/compare/{previous_id}")
+def compare_assessments(
+    assessment_id: str,
+    previous_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Compare two assessment runs for an asset to evaluate historical remediation progress."""
+    curr = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+    prev = db.query(Assessment).filter(Assessment.id == previous_id).first()
+
+    if not curr:
+        raise HTTPException(status_code=404, detail="Current assessment not found")
+    if not prev:
+        raise HTTPException(status_code=404, detail="Comparison assessment not found")
+
+    curr_findings = {f.cve_id: f for f in curr.findings}
+    prev_findings = {f.cve_id: f for f in prev.findings}
+
+    new_cves = set(curr_findings.keys()) - set(prev_findings.keys())
+    resolved_cves = set(prev_findings.keys()) - set(curr_findings.keys())
+    persistent_cves = set(curr_findings.keys()) & set(prev_findings.keys())
+
+    return {
+        "asset_id": curr.asset_id,
+        "asset_name": curr.asset.name if curr.asset else "Unknown",
+        "current_assessment": {
+            "id": curr.id,
+            "title": curr.title,
+            "started_at": curr.started_at.isoformat() if curr.started_at else None,
+            "findings_count": curr.findings_count,
+            "average_risk_score": curr.average_risk_score,
+            "critical_count": curr.critical_count,
+            "high_count": curr.high_count
+        },
+        "previous_assessment": {
+            "id": prev.id,
+            "title": prev.title,
+            "started_at": prev.started_at.isoformat() if prev.started_at else None,
+            "findings_count": prev.findings_count,
+            "average_risk_score": prev.average_risk_score,
+            "critical_count": prev.critical_count,
+            "high_count": prev.high_count
+        },
+        "new_findings": [
+            {
+                "cve_id": cve,
+                "title": curr_findings[cve].title,
+                "severity": curr_findings[cve].severity,
+                "risk_score": curr_findings[cve].risk_score
+            }
+            for cve in new_cves
+        ],
+        "resolved_findings": [
+            {
+                "cve_id": cve,
+                "title": prev_findings[cve].title,
+                "severity": prev_findings[cve].severity,
+                "risk_score": prev_findings[cve].risk_score
+            }
+            for cve in resolved_cves
+        ],
+        "persistent_findings": [
+            {
+                "cve_id": cve,
+                "title": curr_findings[cve].title,
+                "severity": curr_findings[cve].severity,
+                "risk_score": curr_findings[cve].risk_score
+            }
+            for cve in persistent_cves
+        ],
+        "risk_score_delta": round(curr.average_risk_score - prev.average_risk_score, 1),
+        "findings_count_delta": curr.findings_count - prev.findings_count
+    }

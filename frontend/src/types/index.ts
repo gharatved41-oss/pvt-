@@ -113,8 +113,22 @@ export interface DigitalTwin {
   target_config: Record<string, any>;
   current_config: Record<string, any>;
   config_parity_score: number;
+  is_simulation?: boolean;
+  provider_label?: string;
+  simulation_notice?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ConfigComparisonReport {
+  twin_id: string;
+  asset_id: string;
+  config_parity_score: number;
+  matched_parameters: Record<string, any>;
+  differing_parameters: Record<string, { target_value: any; twin_value: any }>;
+  missing_in_twin: string[];
+  missing_in_target: string[];
+  summary: string;
 }
 
 export interface ValidationProcedure {

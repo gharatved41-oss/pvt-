@@ -1,0 +1,13 @@
+{
+  "hostname": "test-duplicates-host",
+  "packages": [
+    {"name": "policykit-1", "version": "0.105-26ubuntu0.1", "architecture": "amd64"},
+    {"name": "policykit-1", "version": "0.105-26ubuntu0.1", "architecture": "amd64"},
+    {"name": "policykit-1", "version": "0.105-26ubuntu0.1", "architecture": "amd64"},
+    {"name": "nginx", "version": "1.24.0", "architecture": "amd64"},
+    {"name": "nginx", "version": "1.24.0", "architecture": "amd64"}
+  ],
+  "configuration_metadata": {
+    "selinux_enforcing": true
+  }
+}

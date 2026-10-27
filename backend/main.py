@@ -20,19 +20,25 @@ def seed_initial_database():
     """Seed initial administrator and realistic test fixtures on first launch."""
     db = SessionLocal()
     try:
-        # 1. Admin user
-        admin = db.query(User).filter(User.email == "admin@vulntwin.local").first()
-        if not admin:
-            admin = User(
-                email="admin@vulntwin.local",
-                hashed_password=get_password_hash("VulnTwin@2026!"),
-                full_name="Lead Cyber Architect",
-                role="admin",
-                is_active=True
-            )
-            db.add(admin)
-            db.commit()
-            logger.info("Initialized default administrator account: admin@vulntwin.local")
+        # 1. Admin & Analyst demo users
+        demo_users = [
+            ("admin@vulntwin.com", "VulnTwin@2026!", "Lead Cyber Administrator", "admin"),
+            ("analyst@vulntwin.com", "SecurePassword123!", "Senior Security Analyst", "analyst"),
+            ("admin@vulntwin.local", "VulnTwin@2026!", "Lead Cyber Architect", "admin"),
+        ]
+        for email, pwd, name, role in demo_users:
+            usr = db.query(User).filter(User.email == email).first()
+            if not usr:
+                usr = User(
+                    email=email,
+                    hashed_password=get_password_hash(pwd),
+                    full_name=name,
+                    role=role,
+                    is_active=True
+                )
+                db.add(usr)
+                db.commit()
+                logger.info(f"Initialized default demo account: {email} ({role})")
 
         # 2. Demo Assets & Inventories if none exist
         if db.query(Asset).count() == 0:
@@ -164,6 +170,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security Hardening Response Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 # Global exception handler to prevent leaking sensitive tracebacks
 @app.exception_handler(Exception)

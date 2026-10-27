@@ -8,6 +8,7 @@ from ..deps import get_current_user
 router = APIRouter(prefix="/settings", tags=["Application Settings"])
 
 @router.get("")
+@router.get("/system")
 def get_system_settings(current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
     return {
         "project_name": settings.PROJECT_NAME,

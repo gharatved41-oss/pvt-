@@ -179,9 +179,11 @@ export const RetestingPage: React.FC = () => {
               Before-and-After Remediation Verification Comparison
             </h3>
             <span className={`px-2.5 py-1 rounded text-xs font-mono font-bold uppercase ${
-              activeComparison.final_status === 'resolved'
+              activeComparison.final_status === 'resolved' || activeComparison.final_status === 'fixed'
                 ? 'bg-emerald-950 text-emerald-400 border border-emerald-700'
-                : 'bg-amber-950 text-amber-400 border border-amber-700'
+                : activeComparison.final_status === 'inconclusive'
+                ? 'bg-amber-950 text-amber-400 border border-amber-700'
+                : 'bg-rose-950 text-rose-400 border border-rose-700'
             }`}>
               Outcome: {activeComparison.final_status}
             </span>
@@ -273,7 +275,11 @@ export const RetestingPage: React.FC = () => {
                     <td className="px-5 py-3 text-emerald-400 font-bold">{res.package_version_after}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        res.post_fix_status === 'resolved' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400'
+                        res.post_fix_status === 'resolved'
+                          ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                          : res.post_fix_status === 'inconclusive'
+                          ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                          : 'bg-rose-950 text-rose-400 border border-rose-800'
                       }`}>
                         {res.post_fix_status}
                       </span>

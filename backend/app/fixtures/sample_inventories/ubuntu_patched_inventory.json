@@ -1,0 +1,52 @@
+{
+  "hostname": "prod-web-gateway-01",
+  "ip_address": "10.0.4.15",
+  "os_type": "linux",
+  "os_version": "Ubuntu 22.04.2 LTS",
+  "environment": "production",
+  "criticality": "critical",
+  "configuration_metadata": {
+    "kernel": "5.15.0-76-generic",
+    "open_ports": [22, 80, 443],
+    "firewall_active": true,
+    "selinux_enforcing": true,
+    "ssh_root_login": "prohibit-password"
+  },
+  "packages": [
+    {
+      "name": "policykit-1",
+      "version": "0.105-32ubuntu0.1",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "userspace authorization toolkit (patched)"
+    },
+    {
+      "name": "openssh-server",
+      "version": "1:9.3p2-1ubuntu1",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "secure shell (SSH) server (patched)"
+    },
+    {
+      "name": "nginx",
+      "version": "1.25.3-1ubuntu1",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "high performance web server (patched)"
+    },
+    {
+      "name": "curl",
+      "version": "8.4.0-1ubuntu1",
+      "architecture": "amd64",
+      "status": "installed",
+      "description": "command line tool for transferring data (patched)"
+    },
+    {
+      "name": "log4j-core",
+      "version": "2.17.1",
+      "architecture": "all",
+      "status": "installed",
+      "description": "Apache Log4j Core implementation (patched)"
+    }
+  ]
+}

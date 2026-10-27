@@ -20,19 +20,23 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
     Base.metadata.create_all(bind=test_engine)
-    # Seed admin user
+    # Seed demo and test users
     db = TestingSessionLocal()
-    admin = db.query(User).filter(User.email == "testadmin@vulntwin.com").first()
-    if not admin:
-        admin = User(
-            email="testadmin@vulntwin.com",
-            hashed_password=get_password_hash("TestAdmin@123"),
-            full_name="Test Suite Admin",
-            role="admin",
-            is_active=True
-        )
-        db.add(admin)
-        db.commit()
+    users_to_seed = [
+        ("testadmin@vulntwin.com", "TestAdmin@123", "Test Suite Admin", "admin"),
+        ("admin@vulntwin.com", "VulnTwin@2026!", "Lead Cyber Administrator", "admin"),
+    ]
+    for email, pwd, name, role in users_to_seed:
+        if not db.query(User).filter(User.email == email).first():
+            user = User(
+                email=email,
+                hashed_password=get_password_hash(pwd),
+                full_name=name,
+                role=role,
+                is_active=True
+            )
+            db.add(user)
+    db.commit()
     db.close()
     yield
     Base.metadata.drop_all(bind=test_engine)

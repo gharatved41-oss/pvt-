@@ -115,5 +115,6 @@ def get_dashboard_metrics(
         "status_distribution": status_distribution,
         "recent_assessments": recent_assessments,
         "recent_findings": recent_findings,
-        "recent_audit_events": recent_audits
+        "recent_audit_events": recent_audits,
+        "recent_audits": recent_audits
     }

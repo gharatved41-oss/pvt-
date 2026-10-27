@@ -13,15 +13,16 @@ def clean_version_str(v_str: str) -> str:
     """Normalize package version string for safe semantic comparison."""
     if not v_str:
         return "0.0.0"
+    v_str = str(v_str).strip()
     # Remove debian epoch prefix like '1:8.9p1' -> '8.9p1'
     if ":" in v_str:
         v_str = v_str.split(":", 1)[1]
-    # Remove distro tags like 'ubuntu0.1'
-    v_str = re.sub(r'ubuntu.*', '', v_str)
-    # Convert debian hyphen revisions to dot so 0.105-32 becomes 0.105.32
-    v_str = v_str.replace("-", ".")
+    # Remove distro and build tags (ubuntu, deb, el, fc, amzn, git)
+    v_str = re.sub(r'(ubuntu|deb|el|fc|amzn|arch|build|\+git).*', '', v_str, flags=re.IGNORECASE)
     # Strip trailing patch letters like 9.3p1 -> 9.3.1
     v_str = re.sub(r'p(\d+)', r'.\1', v_str)
+    # Convert debian hyphen revisions and tildes to dots so 0.105-32 becomes 0.105.32
+    v_str = v_str.replace("-", ".").replace("~", ".")
     # Extract only valid version digits and dots
     match = re.search(r'(\d+(\.\d+)*)', v_str)
     if match:

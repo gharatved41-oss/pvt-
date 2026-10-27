@@ -2,7 +2,7 @@ import axios from 'axios';
 import {
   Asset, Assessment, VulnerabilityFinding, DigitalTwin, ValidationRun,
   RemediationRecommendation, RetestResult, BeforeAfterComparison,
-  DashboardMetrics, AuditEvent, SystemSettings, User
+  DashboardMetrics, AuditEvent, SystemSettings, User, ConfigComparisonReport
 } from '../types';
 
 const API_BASE_URL = '/api/v1';
@@ -88,8 +88,18 @@ export const api = {
     });
     return res.data;
   },
+  validateInventory: async (assetId: string, formData: FormData) => {
+    const res = await apiClient.post(`/assets/${assetId}/inventory/validate`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
   getAssetSnapshots: async (assetId: string) => {
     const res = await apiClient.get(`/assets/${assetId}/snapshots`);
+    return res.data;
+  },
+  getAssetEvidence: async (assetId: string) => {
+    const res = await apiClient.get(`/assets/${assetId}/evidence`);
     return res.data;
   },
 
@@ -104,6 +114,14 @@ export const api = {
   },
   runAssessment: async (assetId: string, title?: string, notes?: string): Promise<Assessment> => {
     const res = await apiClient.post('/assessments', { asset_id: assetId, title, notes });
+    return res.data;
+  },
+  deleteAssessment: async (id: string) => {
+    const res = await apiClient.delete(`/assessments/${id}`);
+    return res.data;
+  },
+  compareAssessments: async (assessmentId: string, previousId: string) => {
+    const res = await apiClient.get(`/assessments/${assessmentId}/compare/${previousId}`);
     return res.data;
   },
 
@@ -132,28 +150,56 @@ export const api = {
     const res = await apiClient.post('/risk/evaluate', data);
     return res.data;
   },
+  getRiskModelStatus: async () => {
+    const res = await apiClient.get('/risk/model-status');
+    return res.data;
+  },
 
   // Digital Twins
   getTwins: async (assetId?: string): Promise<DigitalTwin[]> => {
     const res = await apiClient.get('/twins', { params: { asset_id: assetId } });
     return res.data;
   },
+  getTwin: async (twinId: string): Promise<DigitalTwin> => {
+    const res = await apiClient.get(`/twins/${twinId}`);
+    return res.data;
+  },
   getTwinTemplates: async () => {
     const res = await apiClient.get('/twins/templates');
     return res.data;
   },
-  createTwin: async (data: { asset_id: string; name: string; template_name: string }): Promise<DigitalTwin> => {
+  getTwinProviders: async () => {
+    const res = await apiClient.get('/twins/providers');
+    return res.data;
+  },
+  createTwin: async (data: { asset_id: string; name: string; template_name: string; provider?: string }): Promise<DigitalTwin> => {
     const res = await apiClient.post('/twins', data);
     return res.data;
   },
-  executeTwinAction: async (twinId: string, action: string) => {
-    const res = await apiClient.post(`/twins/${twinId}/actions`, { action });
+  executeTwinAction: async (twinId: string, action: string, snapshotName?: string) => {
+    const res = await apiClient.post(`/twins/${twinId}/actions`, { action, snapshot_name: snapshotName });
+    return res.data;
+  },
+  compareTwinConfig: async (twinId: string): Promise<ConfigComparisonReport> => {
+    const res = await apiClient.get(`/twins/${twinId}/compare-config`);
+    return res.data;
+  },
+  getTwinIsolation: async (twinId: string) => {
+    const res = await apiClient.get(`/twins/${twinId}/isolation`);
+    return res.data;
+  },
+  deleteTwin: async (twinId: string) => {
+    const res = await apiClient.delete(`/twins/${twinId}`);
     return res.data;
   },
 
   // Controlled Validation
   getValidationProcedures: async () => {
     const res = await apiClient.get('/validation/procedures');
+    return res.data;
+  },
+  getValidationProcedure: async (procedureCode: string) => {
+    const res = await apiClient.get(`/validation/procedures/${procedureCode}`);
     return res.data;
   },
   getValidationRuns: async (findingId?: string, twinId?: string): Promise<ValidationRun[]> => {
@@ -174,8 +220,16 @@ export const api = {
     const res = await apiClient.get('/remediation/recommendations', { params: { finding_id: findingId, status } });
     return res.data;
   },
+  generateRemediation: async (findingId: string): Promise<RemediationRecommendation> => {
+    const res = await apiClient.post(`/remediation/findings/${findingId}/generate`);
+    return res.data;
+  },
   reviewRemediation: async (recId: string, status: 'approved' | 'rejected', justification: string) => {
     const res = await apiClient.post(`/remediation/recommendations/${recId}/approval`, { status, justification });
+    return res.data;
+  },
+  getRemediationApprovals: async (recId: string) => {
+    const res = await apiClient.get(`/remediation/recommendations/${recId}/approvals`);
     return res.data;
   },
   applyRemediationInTwin: async (recId: string, twinId: string) => {
@@ -198,11 +252,37 @@ export const api = {
   },
 
   // Reports
-  downloadPdfReport: (assessmentId: string) => {
-    window.open(`${API_BASE_URL}/reports/assessments/${assessmentId}/pdf`, '_blank');
+  downloadPdfReport: async (assessmentId: string) => {
+    try {
+      const res = await apiClient.get(`/reports/assessments/${assessmentId}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `VulnTwin-Report-${assessmentId.slice(0, 8)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('PDF download error:', e);
+      alert('Failed to download PDF report. Ensure you are authenticated.');
+    }
   },
-  downloadCsvReport: (assessmentId: string) => {
-    window.open(`${API_BASE_URL}/reports/assessments/${assessmentId}/csv`, '_blank');
+  downloadCsvReport: async (assessmentId: string) => {
+    try {
+      const res = await apiClient.get(`/reports/assessments/${assessmentId}/csv`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `VulnTwin-Report-${assessmentId.slice(0, 8)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('CSV download error:', e);
+      alert('Failed to download CSV report. Ensure you are authenticated.');
+    }
   },
 
   // Audit Logs

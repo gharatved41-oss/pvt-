@@ -23,8 +23,10 @@ def evaluate_risk(
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    Run ad-hoc ML risk prioritization model evaluation with feature weight breakdown.
-    Demonstrates model explainability and separation of severity vs risk.
+    Run explainable risk prioritization evaluation with:
+    - Separation of Severity vs Exploitability vs Contextual Risk.
+    - Transparent baseline derivation & evaluated ML model output.
+    - Contributing factors and uncertainty estimation with confidence interval.
     """
     return ml_risk_engine.evaluate_risk(
         cvss_score=req.cvss_score,
@@ -35,3 +37,10 @@ def evaluate_risk(
         evidence_depth=req.evidence_depth,
         detection_status=req.detection_status
     )
+
+@router.get("/model-status")
+def get_risk_model_status(
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Return scikit-learn model evaluation benchmarks, cross-validation metrics, and active state."""
+    return ml_risk_engine.model_evaluation

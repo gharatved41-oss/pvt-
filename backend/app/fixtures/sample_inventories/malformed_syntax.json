@@ -1,0 +1,5 @@
+{
+  "hostname": "test-malformed-server",
+  "packages": [
+    {"name": "openssh-server", "version": "8.9p1"
+}

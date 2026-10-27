@@ -102,28 +102,135 @@ npm run dev
 
 ---
 
-## Automated Test Execution & Results
+## Automated Test Suite & Complete Verification Results
 
-Comprehensive automated unit and end-to-end integration tests are implemented with `pytest`:
+Comprehensive automated unit, integration, security, and end-to-end regression tests are implemented with `pytest` covering all 8 phases of the cybersecurity platform:
 
 ```bash
 cd backend
 python -m pytest tests/ -v
 ```
 
-### Actual Test Results
+### Full Test Suite Results (53 Passing Tests)
 ```text
-tests/test_all_workflows.py::test_auth_workflow PASSED                   [ 12%]
-tests/test_all_workflows.py::test_inventory_parser_json PASSED           [ 25%]
-tests/test_all_workflows.py::test_inventory_parser_csv PASSED            [ 37%]
-tests/test_all_workflows.py::test_cve_version_matching PASSED            [ 50%]
-tests/test_all_workflows.py::test_cve_service_deduplication PASSED       [ 62%]
-tests/test_all_workflows.py::test_ml_risk_engine PASSED                  [ 75%]
-tests/test_all_workflows.py::test_digital_twin_lifecycle PASSED          [ 87%]
-tests/test_all_workflows.py::test_end_to_end_assessment_validation_remediation_retest PASSED [100%]
+tests/test_all_workflows.py::test_auth_workflow PASSED                   [  1%]
+tests/test_all_workflows.py::test_inventory_parser_json PASSED           [  3%]
+tests/test_all_workflows.py::test_inventory_parser_csv PASSED            [  5%]
+tests/test_all_workflows.py::test_cve_version_matching PASSED            [  7%]
+tests/test_all_workflows.py::test_cve_service_deduplication PASSED       [  9%]
+tests/test_all_workflows.py::test_ml_risk_engine PASSED                  [ 11%]
+tests/test_all_workflows.py::test_digital_twin_lifecycle PASSED          [ 13%]
+tests/test_all_workflows.py::test_end_to_end_assessment_validation_remediation_retest PASSED [ 15%]
+tests/test_phase1.py::test_phase1_unauthenticated_protected_routes PASSED [ 16%]
+tests/test_phase1.py::test_phase1_seeded_admin_and_analyst_logins PASSED [ 18%]
+tests/test_phase1.py::test_phase1_role_based_access PASSED               [ 20%]
+tests/test_phase1.py::test_phase1_dashboard_structure PASSED             [ 22%]
+tests/test_phase2.py::test_phase2_asset_lifecycle PASSED                 [ 24%]
+tests/test_phase2.py::test_phase2_inventory_validation_and_json_import PASSED [ 26%]
+tests/test_phase2.py::test_phase2_inventory_csv_import_and_headers PASSED [ 28%]
+tests/test_phase2.py::test_phase2_cve_semantic_version_range_edge_cases PASSED [ 30%]
+tests/test_phase2.py::test_phase2_cve_matching_and_deduplication PASSED  [ 32%]
+tests/test_phase2.py::test_phase2_evidence_storage_and_queries PASSED    [ 33%]
+tests/test_phase2.py::test_phase2_assessment_history_and_comparison PASSED [ 35%]
+tests/test_phase3.py::test_phase3_explainable_baseline_risk_calculation PASSED [ 37%]
+tests/test_phase3.py::test_phase3_separation_of_severity_exploitability_and_context PASSED [ 39%]
+tests/test_phase3.py::test_phase3_scikit_learn_evaluation_gate PASSED    [ 41%]
+tests/test_phase3.py::test_phase3_contributing_factors_and_uncertainty PASSED [ 43%]
+tests/test_phase3.py::test_phase3_api_endpoints PASSED                   [ 45%]
+tests/test_phase4.py::test_phase4_environment_templates_and_simulation_labels PASSED [ 47%]
+tests/test_phase4.py::test_phase4_virtualization_provider_abstraction PASSED [ 49%]
+tests/test_phase4.py::test_phase4_twin_records_crud_and_parity_scoring PASSED [ 50%]
+tests/test_phase4.py::test_phase4_configuration_comparison PASSED        [ 52%]
+tests/test_phase4.py::test_phase4_lifecycle_states_and_snapshot_reset PASSED [ 54%]
+tests/test_phase4.py::test_phase4_isolation_verification_enforcement_in_validation PASSED [ 56%]
+tests/test_phase4.py::test_phase4_twin_decommission PASSED               [ 58%]
+tests/test_phase5.py::test_phase5_procedure_registry_specifications PASSED [ 60%]
+tests/test_phase5.py::test_phase5_positive_safe_validation_and_evidence_persistence PASSED [ 62%]
+tests/test_phase5.py::test_phase5_negative_safe_validation_not_reproduced PASSED [ 64%]
+tests/test_phase5.py::test_phase5_blocked_unapproved_procedure PASSED    [ 66%]
+tests/test_phase5.py::test_phase5_blocked_destructive_command_safety PASSED [ 67%]
+tests/test_phase5.py::test_phase5_inconclusive_missing_installed_version PASSED [ 69%]
+tests/test_phase5.py::test_phase5_inconclusive_component_mismatch PASSED [ 71%]
+tests/test_phase6.py::test_phase6_evidence_backed_recommendation_generation PASSED [ 73%]
+tests/test_phase6.py::test_phase6_approval_and_rejection_workflows PASSED [ 75%]
+tests/test_phase6.py::test_phase6_safe_lab_remediation_adapter_application PASSED [ 77%]
+tests/test_phase6.py::test_phase6_production_protection_never_auto_change_production PASSED [ 79%]
+tests/test_phase7.py::test_phase7_successful_retest_and_evidence_persistence PASSED [ 81%]
+tests/test_phase7.py::test_phase7_failed_retest_unresolved_status PASSED [ 83%]
+tests/test_phase7.py::test_phase7_inconclusive_retest_indeterminate_telemetry PASSED [ 84%]
+tests/test_phase7.py::test_phase7_inconclusive_retest_scanner_validation_discrepancy PASSED [ 86%]
+tests/test_phase7.py::test_phase7_before_after_comparison_endpoint PASSED [ 88%]
+tests/test_phase7.py::test_phase7_query_results_and_guardrails PASSED    [ 90%]
+tests/test_phase8.py::test_phase8_dashboard_metrics_aggregation PASSED   [ 92%]
+tests/test_phase8.py::test_phase8_pdf_reporting_endpoint PASSED          [ 94%]
+tests/test_phase8.py::test_phase8_csv_reporting_endpoint PASSED          [ 96%]
+tests/test_phase8.py::test_phase8_audit_logs_query_and_filtering PASSED  [ 98%]
+tests/test_phase8.py::test_phase8_security_headers_and_unauthenticated_guardrails PASSED [100%]
 
-======================== 8 passed in 1.82s ========================
+======================= 53 passed, 1 warning in 13.53s =======================
 ```
+
+---
+
+## Interactive Capstone Demonstration Walkthrough
+
+Follow these steps to demonstrate the full end-to-end capabilities of Vuln TWin:
+
+### Step 1: Authentication & RBAC Inspection
+1. Open `http://localhost:5173` in your browser.
+2. Log in using `admin@vulntwin.com` / `VulnTwin@2026!`.
+3. Inspect the live metrics dashboard: registered assets, detected CVEs, twin validated counts, and the severity/status breakdown charts.
+
+### Step 2: Asset Management & Manifest Ingestion
+1. Navigate to **Assets** (`/assets`).
+2. Notice pre-seeded demo assets: *Primary Production Web Gateway* (Ubuntu) and *Domain Controller Staging* (Windows).
+3. Click **Import Inventory** on the Ubuntu asset.
+4. Upload or paste a package manifest (e.g. `backend/app/fixtures/sample_inventories/ubuntu_server_inventory.json`).
+5. Observe the package inventory count update with verified architectures and checksums.
+
+### Step 3: Run Security Assessment & AI/ML Risk Scoring
+1. Navigate to **Assessments** (`/assessments`) and click **Execute Assessment**.
+2. Select *Primary Production Web Gateway* and submit.
+3. Review the completed assessment: average risk score, finding severity counts.
+4. Click **Findings** to view detected CVEs (`/vulnerabilities`).
+5. Select `CVE-2021-4034` (Polkit pkexec) or `CVE-2023-38408` (OpenSSH).
+6. Inspect the AI/ML realized risk gauge (0–100), contributing factor weights, and forensic manifest evidence.
+
+### Step 4: Digital Twin Sandbox Inspection & Isolation Check
+1. Navigate to **Digital Twins** (`/twins`).
+2. Inspect the sandbox replica for the target asset.
+3. Click **Verify Isolation**: observe the airgap telemetry check (VLAN 1099, 0 WAN routes, No production IP overlap).
+4. Click **Compare Config** to view configuration parity scoring between production target and twin lab.
+
+### Step 5: Controlled Non-Destructive Validation
+1. Navigate to **Validation Lab** (`/validation`).
+2. Select finding `CVE-2021-4034` and the isolated twin replica.
+3. Execute the certified procedure `PROC-SEC-PKEXEC-01`.
+4. Review the diagnostic probe execution: safely queries `argv[0]` bounds without running unconstrained root code.
+5. Finding status transitions to **Confirmed**.
+
+### Step 6: Evidence-Backed Remediation & Human Approval
+1. Navigate to **Remediation** (`/remediation`).
+2. Review the generated recommendation: vendor advisory URL, prerequisites, command preview, and rollback instructions.
+3. Under the approval section, select **Approve for Sandbox** and provide compliance justification.
+4. Click **Apply in Isolated Twin Sandbox**: the certified adapter applies the upgrade within the isolated twin (`0.105-26` -> `0.105-31.1`).
+5. Notice: Production assets remain 100% untouched.
+
+### Step 7: Dual-Verification Retesting
+1. Navigate to **Retesting & Verification** (`/retesting`).
+2. Select the remediated finding and twin sandbox.
+3. Click **Run Retest Verification**:
+   - Dynamic twin inspection recollecting package version (`0.105-31.1`).
+   - CVE detection rules re-evaluated: **Cleared**.
+   - Non-destructive validation probe re-executed: **Mitigated**.
+4. Both checks corroborate $\rightarrow$ status becomes **Resolved**, finding marked **Fixed**, and ML risk score drops to **0.0 / Remediated**.
+5. View the side-by-side Before-and-After comparative diff.
+
+### Step 8: Executive Reporting & Compliance Audit Trail
+1. Return to **Assessments** (`/assessments`).
+2. Click the **PDF** icon to download the styled executive report with before/after evidence.
+3. Click the **CSV** icon to download structured CSV vulnerability export data.
+4. Navigate to **Audit Trail** (`/audit`) to review the immutable audit log tracking every user action, IP, timestamp, and metadata payload.
 
 ---
 
@@ -133,8 +240,8 @@ The database is seeded with initial accounts on first launch:
 
 | Role | Email | Password | Permissions |
 |---|---|---|---|
-| **Administrator** | `admin@vulntwin.com` | `VulnTwin@2026!` | Full administrative access, audit logs, asset deletions |
-| **Security Analyst** | `analyst@vulntwin.com` | `SecurePassword123!` | Asset enrollment, scan runs, validation testing, approvals |
+| **Administrator** | `admin@vulntwin.com` | `VulnTwin@2026!` | Full administrative access, audit logs, asset deletions, user management |
+| **Security Analyst** | `analyst@vulntwin.com` | `SecurePassword123!` | Asset enrollment, scan runs, validation testing, approvals, retests |
 
 ---
 

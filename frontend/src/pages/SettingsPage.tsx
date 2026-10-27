@@ -9,6 +9,7 @@ import { SystemSettings } from '../types';
 export const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [health, setHealth] = useState<any>(null);
+  const [modelStatus, setModelStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   // ML Risk Simulator Interactive Sandbox
@@ -24,12 +25,14 @@ export const SettingsPage: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [settingsData, healthData] = await Promise.all([
+      const [settingsData, healthData, modelData] = await Promise.all([
         api.getSettings(),
-        api.getHealth()
+        api.getHealth(),
+        api.getRiskModelStatus().catch(() => null)
       ]);
       setSettings(settingsData);
       setHealth(healthData);
+      setModelStatus(modelData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -119,11 +122,15 @@ export const SettingsPage: React.FC = () => {
             <BrainCircuit className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-sm font-bold text-slate-200">
-            GradientBoostingRegressor
+            {modelStatus?.model_type || 'GradientBoostingRegressor'}
           </div>
           <div className="flex items-center text-cyan-400 text-[11px]">
             <CheckCircle2 className="w-3 h-3 mr-1" />
-            <span>Ensemble Calibrated & Active</span>
+            <span>
+              {modelStatus?.is_ml_active
+                ? `Active (R²=${modelStatus.r2_score}, MAE=±${modelStatus.mean_absolute_error})`
+                : 'Baseline Engine Active'}
+            </span>
           </div>
         </div>
       </div>
@@ -261,12 +268,101 @@ export const SettingsPage: React.FC = () => {
 
         {/* Simulator Result Output */}
         {simResult && (
-          <div className="mt-4 p-4 rounded-lg bg-slate-950 border border-cyan-800/60 font-mono text-xs space-y-2">
-            <div className="flex justify-between items-center text-cyan-400 font-bold">
-              <span>PREDICTED RISK SCORE: {simResult.risk_score} / 100 ({simResult.risk_category})</span>
-              <span className="text-slate-400">Priority: {simResult.recommended_priority}</span>
+          <div className="mt-4 p-5 rounded-lg bg-slate-950 border border-cyan-800/60 font-mono text-xs space-y-4">
+            {/* Top Score Bar */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-slate-800">
+              <div>
+                <span className="text-slate-400 text-[10px] block uppercase">Composite Realized Risk</span>
+                <span className="text-xl font-extrabold text-cyan-400">
+                  {simResult.risk_score} <span className="text-xs text-slate-500">/ 100</span> ({simResult.risk_category})
+                </span>
+              </div>
+              <div className="text-left sm:text-right">
+                <span className="text-slate-400 text-[10px] block uppercase">Recommended Action</span>
+                <span className="text-xs font-bold text-amber-400">{simResult.recommended_priority}</span>
+              </div>
             </div>
-            <p className="text-slate-300 font-sans">{simResult.risk_explanation}</p>
+
+            {/* Separated Dimensions: Severity vs Exploitability vs Context */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Intrinsic Severity */}
+              <div className="p-3 rounded bg-slate-900 border border-slate-800 space-y-1">
+                <span className="text-slate-400 text-[10px] uppercase block">1. Intrinsic Severity</span>
+                <div className="text-sm font-bold text-amber-400">
+                  CVSS {simResult.severity_metrics?.cvss_base_score || simResult.severity}
+                </div>
+                <p className="text-[10px] text-slate-400 font-sans">
+                  Property of flaw alone; independent of target environment.
+                </p>
+              </div>
+
+              {/* Exploitability */}
+              <div className="p-3 rounded bg-slate-900 border border-slate-800 space-y-1">
+                <span className="text-slate-400 text-[10px] uppercase block">2. Exploit Intelligence</span>
+                <div className="text-sm font-bold text-purple-400">
+                  {simResult.exploitability_metrics?.exploit_maturity || 'PoC Code'}
+                </div>
+                <p className="text-[10px] text-slate-400 font-sans">
+                  {simResult.exploitability_metrics?.weaponized ? 'Weaponized public exploit' : 'Public code / advisory available'}
+                </p>
+              </div>
+
+              {/* Contextual Asset Risk */}
+              <div className="p-3 rounded bg-slate-900 border border-slate-800 space-y-1">
+                <span className="text-slate-400 text-[10px] uppercase block">3. Contextual Asset Risk</span>
+                <div className="text-sm font-bold text-cyan-400">
+                  {simResult.contextual_metrics?.asset_criticality} on {simResult.contextual_metrics?.asset_environment}
+                </div>
+                <p className="text-[10px] text-slate-400 font-sans">
+                  {simResult.contextual_metrics?.reachability} context.
+                </p>
+              </div>
+            </div>
+
+            {/* Baseline vs Model Comparison & Uncertainty */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
+              <div className="p-3 rounded bg-slate-900/60 border border-slate-800 space-y-1">
+                <span className="text-slate-400 text-[10px] uppercase block">Calculation Transparency</span>
+                <div className="flex items-center space-x-3 text-xs">
+                  <span>Baseline Formula: <strong className="text-slate-200">{simResult.baseline_risk_score}</strong></span>
+                  {simResult.ml_risk_score !== null && (
+                    <span>ML Ensemble: <strong className="text-cyan-400">{simResult.ml_risk_score}</strong></span>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 font-sans">Engine: {simResult.scoring_engine}</p>
+              </div>
+
+              <div className="p-3 rounded bg-slate-900/60 border border-slate-800 space-y-1">
+                <span className="text-slate-400 text-[10px] uppercase block">Uncertainty & Confidence</span>
+                <div className="flex items-center space-x-3 text-xs">
+                  <span>Confidence: <strong className="text-emerald-400">{Math.round((simResult.confidence_score || 0.85) * 100)}%</strong></span>
+                  <span>Margin: <strong className="text-slate-300">±{simResult.uncertainty?.margin_of_error || 5.0} pts</strong></span>
+                </div>
+                <p className="text-[10px] text-slate-400 font-sans">
+                  Interval: [{simResult.uncertainty?.confidence_interval?.[0]} - {simResult.uncertainty?.confidence_interval?.[1]}]
+                </p>
+              </div>
+            </div>
+
+            {/* Contributing Factor Breakdown */}
+            {simResult.contributing_factors && (
+              <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
+                <span className="text-slate-400 text-[10px] uppercase block">Contributing Factors & Weights</span>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px]">
+                  {Object.entries(simResult.contributing_factors).map(([key, item]: any) => (
+                    <div key={key} className="p-2 bg-slate-900 rounded border border-slate-800">
+                      <span className="text-slate-400 block truncate">{key.replace(/_/g, ' ').toUpperCase()}</span>
+                      <span className="text-cyan-400 font-bold">{item.weight} ({item.points_contributed || 0} pts)</span>
+                      <p className="text-slate-500 truncate mt-0.5">{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="text-slate-300 font-sans text-xs bg-slate-900/50 p-2.5 rounded border border-slate-800">
+              {simResult.risk_explanation}
+            </p>
           </div>
         )}
       </div>
